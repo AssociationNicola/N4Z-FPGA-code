@@ -55,6 +55,14 @@ class Nicola4Z
         return sts.read<reg::data>();
     }
 
+    uint32_t get_pd_delays() {
+        return sts.read<reg::pd_delays>();
+    }
+
+    uint32_t get_pd4_delay() {
+        return sts.read<reg::pd4_delay>();
+    }
+
 
     uint32_t get_ck_inner_io() {
         return sts.read<reg::ck_inner_io>();

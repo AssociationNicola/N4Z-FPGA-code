@@ -16,6 +16,7 @@ cores:
   - ./cores/i2s_rx_v1_0
   - ./cores/ssb_modulator_v1_0
   - ./cores/averager_v1_0
+  - ./cores/photodiode_delay_v1_0
 
 memory:
   - name: control
@@ -56,7 +57,7 @@ control_registers:
   - lcd
 
 
-#control bits: 0 upper or lower side band on reception, 1 TX_high, 2:3 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q), bit 4 select input to FIRs (0 for RX,1 for TX), bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register)
+#control bits: 0 upper or lower side band on reception, 1 TX_high, 2:3 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q), bit 4 select input to FIRs (0 for RX,1 for TX), bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
 
 status_registers:
   - forty_two
@@ -64,6 +65,8 @@ status_registers:
   - max_amplitude
   - ck_inner_io
   - data
+  - pd_delays
+  - pd4_delay
 
 parameters:
   fclk0: 100000000 # FPGA clock speed in Hz

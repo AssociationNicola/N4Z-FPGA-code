@@ -64,6 +64,15 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
+    def get_pd_delays(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_pd4_delay(self):
+        return self.client.recv_uint32()
+
+
+    @command()
     def write_data(self,data):
         pass
 

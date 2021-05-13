@@ -24,11 +24,7 @@ create_bd_port -dir O DRST
 create_bd_port -dir O D_C
 create_bd_port -dir O ECS
 create_bd_port -dir O ENA
-create_bd_port -dir I PD1
-create_bd_port -dir I PD2
-create_bd_port -dir I PD3
-create_bd_port -dir I PD4
-create_bd_port -dir I PD5
+create_bd_port -dir I -from 4 -to 0 PD
 create_bd_port -dir O LCD_E
 create_bd_port -dir O LCD_RW
 create_bd_port -dir O LCD_RS
@@ -47,6 +43,9 @@ create_bd_port -dir O user_spi_mosi
 create_bd_port -dir O -from  1 -to 0 user_spi_ss
 create_bd_port -dir O user_spi_sck 
 create_bd_port -dir I user_spi_miso 
+
+#Temporarily connect PD signals to LCD signals
+#connect_port_pin LCD [get_concat_pin [list PD1 PD2 PD3 PD4 PD5 [get_constant_pin 0 3] ] ]
 
 
 # Connect LEDs to config register
@@ -445,6 +444,20 @@ NBITS 24
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
 }
 
+cell GN:user:photodiode_delay:1.0 pd_delays {
+} {
+ clk ps_0/fclk_clk0
+ rst [get_slice_pin ctl/control 30 30]
+ 
+}
+
+connect_port_pin PD pd_delays/PD
+#connect_bd_net [get_bd_pins concat_PD1_PD2_PD3_PD4_PD5/dout] [get_bd_pins pd_delays/PD]
+
+connect_pin [get_concat_pin [list pd_delays/PD4_delay [get_constant_pin 0 20]]] sts/pd4_delay
+connect_pin pd_delays/PD_delays  sts/pd_delays
+connect_port_pin Button_Active pd_delays/button_activate
+
 connect_port_pin BUSY [get_slice_pin ctl/display 0 0]
 connect_port_pin DRST [get_slice_pin ctl/display 1 1]
 connect_port_pin  D_C [get_slice_pin ctl/display 2 2]
@@ -557,7 +570,7 @@ connect_port_pin pmod_jb [get_concat_pin [list dac_out/cs dac_out/din dac_out/ld
 #Connect output of mux to input of DAC module
 connect_pin dac_out/data  dac0_mux/dout
 
-connect_port_pin Button_Active [get_slice_pin ctl/control 31 31]
+#connect_port_pin Button_Active [get_slice_pin ctl/control 31 31]
 
 
 connect_port_pin CS5340_NRST proc_sys_reset_0/peripheral_aresetn
