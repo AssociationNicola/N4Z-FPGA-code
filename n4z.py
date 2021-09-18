@@ -38,11 +38,15 @@ class Nicola4Z(object):
 
     @command()
     def read_data(self):
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
+
+    @command()
+    def read_24_data(self):
         return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
 
     @command()
     def read_available_data(self):
-        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
 
 
     @command()
@@ -64,11 +68,7 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
-    def get_pd_delays(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_pd4_delay(self):
+    def get_pd(self):
         return self.client.recv_uint32()
 
 
@@ -144,6 +144,18 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
+#This sets TX mode, need to set_FIR_in_val to 1 to use data from TX fifo and enables ssb modulator
+    def set_TX_Mode(self):
+
+        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
+        self.control_val=self.control_val | 2+2**4
+        self.set_control(self.control_val)
+
+#This sets RX mode, sets_FIR_in_val to 0 to use data from ADC and disables ssb modulator (resets bits 1 and 4 to zero)
+    def set_RX_Mode(self):
+
+        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
+        self.set_control(self.control_val)
 
 
 

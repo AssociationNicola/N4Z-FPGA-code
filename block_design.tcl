@@ -19,17 +19,22 @@ create_bd_port -dir O Button_Active
 create_bd_port -dir O CS5340_NRST
 create_bd_port -dir O SSB_Out0
 create_bd_port -dir O SSB_Out1
-create_bd_port -dir O BUSY
+create_bd_port -dir I BUSY
 create_bd_port -dir O DRST
 create_bd_port -dir O D_C
 create_bd_port -dir O ECS
 create_bd_port -dir O ENA
+create_bd_port -dir O SRCS
+create_bd_port -dir O SDCS
+
+# create_bd_port -dir O LCD_E
+# create_bd_port -dir O LCD_RW
+# create_bd_port -dir O LCD_RS
+# create_bd_port -dir O LCD_V0
+# create_bd_port -dir O -from 7 -to 2 LCD
+
+
 create_bd_port -dir I -from 4 -to 0 PD
-create_bd_port -dir O LCD_E
-create_bd_port -dir O LCD_RW
-create_bd_port -dir O LCD_RS
-create_bd_port -dir O LCD_V0
-create_bd_port -dir O -from 7 -to 0 LCD
 
 create_bd_port -dir I CS5340_SDout
 create_bd_port -dir I CS5340_SCLK
@@ -44,8 +49,6 @@ create_bd_port -dir O -from  1 -to 0 user_spi_ss
 create_bd_port -dir O user_spi_sck 
 create_bd_port -dir I user_spi_miso 
 
-#Temporarily connect PD signals to LCD signals
-#connect_port_pin LCD [get_concat_pin [list PD1 PD2 PD3 PD4 PD5 [get_constant_pin 0 3] ] ]
 
 
 # Connect LEDs to config register
@@ -444,30 +447,41 @@ NBITS 24
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
 }
 
-cell GN:user:photodiode_delay:1.0 pd_delays {
-} {
- clk ps_0/fclk_clk0
- rst [get_slice_pin ctl/control 30 30]
- 
-}
+#cell GN:user:photodiode_delay:1.0 pd_delays {
+#} {
+# clk ps_0/fclk_clk0
+# rst [get_slice_pin ctl/control 30 30]
+# 
+#}
 
-connect_port_pin PD pd_delays/PD
+
+#Now just read simple button status on pd inputs
+connect_port_pin PD sts/pd
+
+
 #connect_bd_net [get_bd_pins concat_PD1_PD2_PD3_PD4_PD5/dout] [get_bd_pins pd_delays/PD]
 
-connect_pin [get_concat_pin [list pd_delays/PD4_delay [get_constant_pin 0 20]]] sts/pd4_delay
-connect_pin pd_delays/PD_delays  sts/pd_delays
-connect_port_pin Button_Active pd_delays/button_activate
+#connect_pin [get_concat_pin [list pd_delays/PD0_delay [get_constant_pin 0 20]]] sts/pd0_delay
+#connect_pin pd_delays/PD_delays  sts/pd
+#connect_port_pin Button_Active pd_delays/button_activate
 
-connect_port_pin BUSY [get_slice_pin ctl/display 0 0]
-connect_port_pin DRST [get_slice_pin ctl/display 1 1]
-connect_port_pin  D_C [get_slice_pin ctl/display 2 2]
-connect_port_pin  ECS [get_slice_pin ctl/display 3 3]
-connect_port_pin  ENA [get_slice_pin ctl/display 4 4]
-connect_port_pin  LCD [get_slice_pin ctl/lcd 7 0]
-connect_port_pin  LCD_E [get_slice_pin ctl/lcd 8 8]
-connect_port_pin  LCD_RW [get_slice_pin ctl/lcd 9 9]
-connect_port_pin  LCD_RS [get_slice_pin ctl/lcd 10 10]
-connect_port_pin  LCD_V0 [get_slice_pin ctl/lcd 11 11]
+#Temporarily connect PD signals to LCD signals
+#connect_port_pin LCD  [get_concat_pin [list  PD pd_delays/button_activate [get_constant_pin 0 2] ] ] 
+
+connect_pin sts/display_i [get_concat_pin [list busy [get_constant_pin 0 31]]]
+
+connect_port_pin DRST [get_slice_pin ctl/display_o 0 0]
+connect_port_pin  D_C [get_slice_pin ctl/display_o 1 1]
+connect_port_pin  ECS [get_slice_pin ctl/display_o 2 2]
+connect_port_pin  ENA [get_slice_pin ctl/display_o 3 3]
+connect_port_pin  SRCS [get_slice_pin ctl/display_o 4 4]
+connect_port_pin  SDCS [get_slice_pin ctl/display_o 5 5]
+
+#connect_port_pin  LCD [get_slice_pin ctl/lcd 7 0]
+# connect_port_pin  LCD_E [get_slice_pin ctl/lcd 8 8]
+# connect_port_pin  LCD_RW [get_slice_pin ctl/lcd 9 9]
+# connect_port_pin  LCD_RS [get_slice_pin ctl/lcd 10 10]
+# connect_port_pin  LCD_V0 [get_slice_pin ctl/lcd 11 11]
 connect_port_pin SSB_Out0 ssb_tx/DRV0 
 connect_port_pin SSB_Out1 ssb_tx/DRV1 
 

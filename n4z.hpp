@@ -24,7 +24,7 @@ namespace Fifo_regs {
     constexpr uint32_t rlr = 0x24;
 }
 
-constexpr uint32_t ARR_SIZE = 1024;
+constexpr uint32_t ARR_SIZE = 1200;
 
 
 
@@ -55,13 +55,24 @@ class Nicola4Z
         return sts.read<reg::data>();
     }
 
-    uint32_t get_pd_delays() {
-        return sts.read<reg::pd_delays>();
+    uint32_t get_pd() {
+        return sts.read<reg::pd>();
     }
 
-    uint32_t get_pd4_delay() {
-        return sts.read<reg::pd4_delay>();
+    uint32_t get_display_i() {
+        return sts.read<reg::display_i>();
     }
+
+
+    uint32_t get_max_amplitude() {
+        return sts.read<reg::max_amplitude>();
+    }
+
+    uint32_t get_average_amplitude() {
+        return sts.read<reg::average_amplitude>();
+    }
+
+
 
 
     uint32_t get_ck_inner_io() {
@@ -78,13 +89,13 @@ class Nicola4Z
     }
 	
 
-    void set_display(uint32_t value) {
-        ctl.write<reg::display>(value);
+    void set_display_o(uint32_t value) {
+        ctl.write<reg::display_o>(value);
     }
 
-    void set_lcd(uint32_t value) {
-        ctl.write<reg::lcd>(value);
-    }
+///    void set_lcd(uint32_t value) {
+///        ctl.write<reg::lcd>(value);
+///    }
 
 	
     void set_average(uint32_t value) {
@@ -97,14 +108,6 @@ class Nicola4Z
 
     void set_control(uint32_t value) {
         ctl.write<reg::control>(value);
-    }
-
-
-    uint32_t get_max_amplitude() {
-        return sts.read<reg::max_amplitude>();
-    }
-    uint32_t get_average_amplitude() {
-        return sts.read<reg::average_amplitude>();
     }
 
 
@@ -152,6 +155,16 @@ class Nicola4Z
         }
         return data;
     }
+
+    auto& read_24_data() {
+        wait_for(24);
+        for (unsigned int i=0; i < 24; i++) {
+            data[i] = read_fifo();
+        }
+        return data;
+    }
+
+
 
     void write_data(const std::array<int32_t, ARR_SIZE>& data) {
         for (unsigned int i=0; i < ARR_SIZE; i++) {
