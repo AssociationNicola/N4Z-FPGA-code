@@ -32,11 +32,20 @@ memory:
 
   - name: data_fifo
     offset: '0x43C10000'
-    range: 64K
+    range: 16K
 
   - name: tx_fifo
     offset: '0x43C20000'
-    range: 64K
+    range: 16K
+
+  - name: ave_i_fifo
+    offset: '0x43C30000'
+    range: 8K
+
+  - name: ave_q_fifo
+    offset: '0x43C38000'
+    range: 8K
+
 
   - name: ck_iic
     offset: '0x40005000'
@@ -55,6 +64,8 @@ control_registers:
   - ssb_tx_frequency
   - display_o
   - lcd
+  - QPSK
+  - KeyPad
 
 
 #control bits: 0 upper or lower side band on reception, 1 TX_high, 2:3 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q), bit 4 select input to FIRs (0 for RX,1 for TX), bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
@@ -68,6 +79,7 @@ status_registers:
   - data
   - pd
   - display_i
+  - KeyPad
 
 #The ADC runs at 200ksps and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker
 parameters:

@@ -1,6 +1,6 @@
 # Add PS and AXI Interconnect
 set board_preset $board_path/config/board_preset.tcl
-source $sdk_path/fpga/lib/starting_point.tcl
+source $project_path/fpga/lib/starting_point_withUart.tcl
 
 # Add config and status registers
 source $sdk_path/fpga/lib/ctl_sts.tcl
@@ -534,6 +534,93 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
   axi_str_rxd_tdata   adc_clock_converter/m_axis_tdata
 }
 
+cell GN:user:IQ_averager:1.0 i_averaged {
+NBITS 32
+STOPAT 320
+} {
+ clk $adc_clk
+ rst $rst_adc_clk_name/peripheral_reset
+ amplitude cic_i/m_axis_data_tdata
+ load_val cic_i/m_axis_data_tvalid
+
+}
+
+
+
+cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
+  TDATA_NUM_BYTES 4
+} {
+  s_axis_tdata i_averaged/average
+  s_axis_tvalid i_averaged/valid
+  s_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
+  m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  s_axis_aclk $adc_clk
+  m_axis_aclk [set ps_clk$intercon_idx]
+}
+
+
+
+set idx [add_master_interface $intercon_idx]
+cell xilinx.com:ip:axi_fifo_mm_s:4.1 i_ave_fifo {
+  C_USE_TX_DATA 0
+  C_USE_TX_CTRL 0
+  C_USE_RX_CUT_THROUGH true
+  C_RX_FIFO_DEPTH 1024
+  C_RX_FIFO_PF_THRESHOLD 1000
+} {
+  s_axi_aclk [set ps_clk$intercon_idx]
+  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
+  axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
+  axi_str_rxd_tdata   adc_clock_converter_i/m_axis_tdata
+}
+
+
+
+cell GN:user:IQ_averager:1.0 q_averaged {
+NBITS 32
+STOPAT 320
+} {
+ clk $adc_clk
+ rst $rst_adc_clk_name/peripheral_reset
+ amplitude cic_q/m_axis_data_tdata
+ load_val cic_q/m_axis_data_tvalid
+
+}
+
+
+
+cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
+  TDATA_NUM_BYTES 4
+} {
+  s_axis_tdata q_averaged/average
+  s_axis_tvalid q_averaged/valid
+  s_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
+  m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  s_axis_aclk $adc_clk
+  m_axis_aclk [set ps_clk$intercon_idx]
+}
+
+
+
+set idx [add_master_interface $intercon_idx]
+cell xilinx.com:ip:axi_fifo_mm_s:4.1 q_ave_fifo {
+  C_USE_TX_DATA 0
+  C_USE_TX_CTRL 0
+  C_USE_RX_CUT_THROUGH true
+  C_RX_FIFO_DEPTH 1024
+  C_RX_FIFO_PF_THRESHOLD 1000
+} {
+  s_axi_aclk [set ps_clk$intercon_idx]
+  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
+  axi_str_rxd_tvalid adc_clock_converter_q/m_axis_tvalid
+  axi_str_rxd_tdata   adc_clock_converter_q/m_axis_tdata
+}
+
+
+
+
 
 #Convert the signed number to an offset unsigned number for the DAC (only use lowest 16 bits)
 cell xilinx.com:ip:c_addsub:12.0 twos_Comp_Unsigned {
@@ -603,6 +690,18 @@ assign_bd_address [get_bd_addr_segs tx_axis_fifo/S_AXI/Mem0]
 set memory_segment_tx  [get_bd_addr_segs /${::ps_name}/Data/SEG_tx_axis_fifo_Mem0]
 set_property offset [get_memory_offset tx_fifo] $memory_segment_tx
 set_property range  [get_memory_range tx_fifo]  $memory_segment_tx
+
+assign_bd_address [get_bd_addr_segs i_ave_fifo/S_AXI/Mem0]
+set memory_segment_data  [get_bd_addr_segs /${::ps_name}/Data/SEG_i_ave_fifo_Mem0]
+set_property offset [get_memory_offset ave_i_fifo] $memory_segment_data
+set_property range  [get_memory_range ave_i_fifo]  $memory_segment_data
+
+assign_bd_address [get_bd_addr_segs q_ave_fifo/S_AXI/Mem0]
+set memory_segment_data  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
+set_property offset [get_memory_offset ave_q_fifo] $memory_segment_data
+set_property range  [get_memory_range ave_q_fifo]  $memory_segment_data
+
+
 
 #Shouldn't need tri-state buffers in this design-
 #set run_autowrapper 0
