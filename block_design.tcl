@@ -19,13 +19,11 @@ create_bd_port -dir O Button_Active
 create_bd_port -dir O CS5340_NRST
 create_bd_port -dir O SSB_Out0
 create_bd_port -dir O SSB_Out1
-create_bd_port -dir I BUSY
-create_bd_port -dir O DRST
-create_bd_port -dir O D_C
-create_bd_port -dir O ECS
-create_bd_port -dir O ENA
-create_bd_port -dir O SRCS
-create_bd_port -dir O SDCS
+create_bd_port -dir I TP_IRQ
+create_bd_port -dir O RST
+create_bd_port -dir O LCD_RS
+create_bd_port -dir O LCD_CS
+create_bd_port -dir O TP_CS
 
 # create_bd_port -dir O LCD_E
 # create_bd_port -dir O LCD_RW
@@ -34,7 +32,9 @@ create_bd_port -dir O SDCS
 # create_bd_port -dir O -from 7 -to 2 LCD
 
 
-create_bd_port -dir I -from 4 -to 0 PD
+create_bd_port -dir I Uart_RX
+create_bd_port -dir O Uart_TX
+
 
 create_bd_port -dir I CS5340_SDout
 create_bd_port -dir I CS5340_SCLK
@@ -49,7 +49,9 @@ create_bd_port -dir O -from  1 -to 0 user_spi_ss
 create_bd_port -dir O user_spi_sck 
 create_bd_port -dir I user_spi_miso 
 
-
+#Connect UART pins
+connect_port_pin Uart_RX ps_0/UART1_RX
+connect_port_pin Uart_TX ps_0/UART1_TX
 
 # Connect LEDs to config register
 connect_port_pin led0 [get_slice_pin ctl/led 2 0]
@@ -455,8 +457,8 @@ NBITS 24
 #}
 
 
-#Now just read simple button status on pd inputs
-connect_port_pin PD sts/pd
+#Now just read simple button status on pd inputs PD pins no longer used
+#connect_port_pin PD sts/pd
 
 
 #connect_bd_net [get_bd_pins concat_PD1_PD2_PD3_PD4_PD5/dout] [get_bd_pins pd_delays/PD]
@@ -468,14 +470,15 @@ connect_port_pin PD sts/pd
 #Temporarily connect PD signals to LCD signals
 #connect_port_pin LCD  [get_concat_pin [list  PD pd_delays/button_activate [get_constant_pin 0 2] ] ] 
 
-connect_pin sts/display_i [get_concat_pin [list busy [get_constant_pin 0 31]]]
+connect_pin sts/display_i [get_concat_pin [list TP_IRQ [get_constant_pin 0 31]]]
 
-connect_port_pin DRST [get_slice_pin ctl/display_o 0 0]
-connect_port_pin  D_C [get_slice_pin ctl/display_o 1 1]
-connect_port_pin  ECS [get_slice_pin ctl/display_o 2 2]
-connect_port_pin  ENA [get_slice_pin ctl/display_o 3 3]
-connect_port_pin  SRCS [get_slice_pin ctl/display_o 4 4]
-connect_port_pin  SDCS [get_slice_pin ctl/display_o 5 5]
+
+
+
+connect_port_pin RST [get_slice_pin ctl/display_o 0 0]
+connect_port_pin  LCD_RS [get_slice_pin ctl/display_o 1 1]
+connect_port_pin  LCD_CS [get_slice_pin ctl/display_o 2 2]
+connect_port_pin  TP_CS [get_slice_pin ctl/display_o 3 3]
 
 #connect_port_pin  LCD [get_slice_pin ctl/lcd 7 0]
 # connect_port_pin  LCD_E [get_slice_pin ctl/lcd 8 8]
@@ -692,14 +695,14 @@ set_property offset [get_memory_offset tx_fifo] $memory_segment_tx
 set_property range  [get_memory_range tx_fifo]  $memory_segment_tx
 
 assign_bd_address [get_bd_addr_segs i_ave_fifo/S_AXI/Mem0]
-set memory_segment_data  [get_bd_addr_segs /${::ps_name}/Data/SEG_i_ave_fifo_Mem0]
-set_property offset [get_memory_offset ave_i_fifo] $memory_segment_data
-set_property range  [get_memory_range ave_i_fifo]  $memory_segment_data
+set memory_segment_i_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_i_ave_fifo_Mem0]
+set_property offset [get_memory_offset ave_i_fifo] $memory_segment_i_ave
+set_property range  [get_memory_range ave_i_fifo]  $memory_segment_i_ave
 
 assign_bd_address [get_bd_addr_segs q_ave_fifo/S_AXI/Mem0]
-set memory_segment_data  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
-set_property offset [get_memory_offset ave_q_fifo] $memory_segment_data
-set_property range  [get_memory_range ave_q_fifo]  $memory_segment_data
+set memory_segment_q_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
+set_property offset [get_memory_offset ave_q_fifo] $memory_segment_q_ave
+set_property range  [get_memory_range ave_q_fifo]  $memory_segment_q_ave
 
 
 

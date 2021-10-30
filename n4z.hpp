@@ -39,6 +39,9 @@ class Nicola4Z
     , xadc(ctx.mm.get<mem::xadc>())
     , data_fifo_map(ctx.mm.get<mem::data_fifo>())
     , tx_fifo_map(ctx.mm.get<mem::tx_fifo>())
+    , ave_i_fifo_map(ctx.mm.get<mem::ave_i_fifo>())
+    , ave_q_fifo_map(ctx.mm.get<mem::ave_q_fifo>())
+
 
     {
     }
@@ -53,10 +56,6 @@ class Nicola4Z
 
     uint32_t get_data() {
         return sts.read<reg::data>();
-    }
-
-    uint32_t get_pd() {
-        return sts.read<reg::pd>();
     }
 
     uint32_t get_display_i() {
@@ -186,7 +185,118 @@ class Nicola4Z
         return data;
     }
 
-	
+
+//Now add fifo for <Iave>
+    uint32_t get_Iave_fifo_occupancy() {
+        return ave_i_fifo_map.read<Fifo_regs::rdfo>();
+    }
+
+
+    void reset_Iave_fifo() {
+        ave_i_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);
+    }
+
+   uint32_t read_Iave_fifo() {
+        return ave_i_fifo_map.read<Fifo_regs::rdfd>();
+    }
+
+
+
+    uint32_t get_Iave_fifo_length() {
+        return (ave_i_fifo_map.read<Fifo_regs::rlr>() & 0x3FFFFF) >> 2;
+    }
+
+    void wait_for_Iave_n_pts(uint32_t n_pts) {
+        do {} while (get_Iave_fifo_length() < n_pts);
+    }
+
+    auto& read_Iave() {
+        wait_for_Iave_n_pts(ARR_SIZE);
+        for (unsigned int i=0; i < ARR_SIZE; i++) {
+            data[i] = read_Iave_fifo();
+        }
+        return data;
+    }
+
+    auto& read_24_Iave() {
+        wait_for_Iave_n_pts(24);
+        for (unsigned int i=0; i < 24; i++) {
+            data[i] = read_Iave_fifo();
+        }
+        return data;
+    }
+
+
+
+
+    auto& read_available_Iave() {
+        uint32_t no_available=get_Iave_fifo_length();
+        for (unsigned int i=0; i < no_available; i++) {
+            data[i] = read_Iave_fifo();
+        }
+        for (unsigned int i=no_available; i < ARR_SIZE-1; i++) {
+            data[i] = 0;
+        }
+        data[ARR_SIZE-1] = no_available;
+
+        return data;
+    }
+
+//and <Qave>	
+    uint32_t get_Qave_fifo_occupancy() {
+        return ave_q_fifo_map.read<Fifo_regs::rdfo>();
+    }
+
+
+    void reset_Qave_fifo() {
+        ave_q_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);
+    }
+
+   uint32_t read_Qave_fifo() {
+        return ave_q_fifo_map.read<Fifo_regs::rdfd>();
+    }
+
+
+
+    uint32_t get_Qave_fifo_length() {
+        return (ave_q_fifo_map.read<Fifo_regs::rlr>() & 0x3FFFFF) >> 2;
+    }
+
+    void wait_for_Qave_n_pts(uint32_t n_pts) {
+        do {} while (get_Qave_fifo_length() < n_pts);
+    }
+
+    auto& read_Qave() {
+        wait_for_Qave_n_pts(ARR_SIZE);
+        for (unsigned int i=0; i < ARR_SIZE; i++) {
+            data[i] = read_Qave_fifo();
+        }
+        return data;
+    }
+
+    auto& read_24_Qave() {
+        wait_for_Qave_n_pts(24);
+        for (unsigned int i=0; i < 24; i++) {
+            data[i] = read_Qave_fifo();
+        }
+        return data;
+    }
+
+
+
+
+    auto& read_available_Qave() {
+        uint32_t no_available=get_Qave_fifo_length();
+        for (unsigned int i=0; i < no_available; i++) {
+            data[i] = read_Qave_fifo();
+        }
+        for (unsigned int i=no_available; i < ARR_SIZE-1; i++) {
+            data[i] = 0;
+        }
+        data[ARR_SIZE-1] = no_available;
+
+        return data;
+    }
 	
   private:
     Memory<mem::control>& ctl;
@@ -194,6 +304,8 @@ class Nicola4Z
     Memory<mem::xadc>& xadc;
     Memory<mem::data_fifo>& data_fifo_map;
     Memory<mem::tx_fifo>& tx_fifo_map;
+    Memory<mem::ave_i_fifo>& ave_i_fifo_map;
+    Memory<mem::ave_q_fifo>& ave_q_fifo_map;
 
     std::array<uint32_t, ARR_SIZE> data;
 

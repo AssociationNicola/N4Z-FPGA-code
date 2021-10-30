@@ -59,6 +59,59 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
 
+#Iave and Q ave fifo read functions:
+    @command()
+    def get_Iave_fifo_occupancy(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_Iave_fifo_length(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def reset_Iave_fifo(self):
+        pass
+
+    @command()
+    def read_Iave(self):
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
+
+    @command()
+    def read_24_Iave(self):
+        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
+
+    @command()
+    def read_available_Iave(self):
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
+
+    @command()
+    def get_Qave_fifo_occupancy(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_Qave_fifo_length(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def reset_Qave_fifo(self):
+        pass
+
+    @command()
+    def read_Qave(self):
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
+
+    @command()
+    def read_24_Qave(self):
+        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
+
+    @command()
+    def read_available_Qave(self):
+        return self.client.recv_array(1024, dtype='int32', check_type=False)
+
+
+
+#end iave and qave functions
+
     @command()
     def xadc_read(self,channel):
         return self.client.recv_uint32()
