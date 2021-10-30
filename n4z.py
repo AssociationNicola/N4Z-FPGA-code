@@ -12,7 +12,7 @@ class Nicola4Z(object):
     def __init__(self, client):
         self.client = client
         # self.n_pts = 16384
-        self.n_pts = 1024
+        self.n_pts = 1200
         self.fs = 2e5 # sampling frequency (Hz)
         self.control_val = 0
 
@@ -38,15 +38,15 @@ class Nicola4Z(object):
 
     @command()
     def read_data(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
-
-    @command()
-    def read_24_data(self):
         return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
 
     @command()
+    def read_24_data(self):
+        return self.client.recv_array(24, dtype='int32', check_type=False)
+
+    @command()
     def read_available_data(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
+        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
 
 
     @command()
@@ -111,6 +111,8 @@ class Nicola4Z(object):
 
 
 #end iave and qave functions
+
+
 
     @command()
     def xadc_read(self,channel):
