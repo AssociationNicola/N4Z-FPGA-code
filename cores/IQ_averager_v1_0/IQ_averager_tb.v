@@ -16,6 +16,7 @@ module averager_tb;
 	// Outputs
 	wire [31:0] average;
 	wire valid;
+        wire bitclock;
 	
 	// Testvars for runlength-testing
 
@@ -27,7 +28,8 @@ module averager_tb;
 		.amplitude(amplitude),
 		.load_val(load_val),
 		.average(average),
-		.valid(valid)
+		.valid(valid),
+                .bitclock(bitclock)
 	);
 
 
@@ -56,7 +58,7 @@ module averager_tb;
 				load_val =0;
 
 				#`EBIT_TIME
-				amplitude = 1900;
+				amplitude = -1900;
 				load_val =1;
                 #`BIT_TIME
 			    load_val=0;
@@ -81,7 +83,7 @@ module averager_tb;
                 #`BIT_TIME
 			    load_val=0;
                 #`EBIT_TIME
-				amplitude = 1960;
+				amplitude = -1960;
 			    load_val =1;
                 #`BIT_TIME
 			    load_val=0;

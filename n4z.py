@@ -59,54 +59,31 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
 
-#Iave and Q ave fifo read functions:
+#I and Q ave fifo read functions (values concatenated to be in sync):
     @command()
-    def get_Iave_fifo_occupancy(self):
+    def get_IQave_fifo_occupancy(self):
         return self.client.recv_uint32()
 
     @command()
-    def get_Iave_fifo_length(self):
+    def get_IQave_fifo_length(self):
         return self.client.recv_uint32()
 
     @command()
-    def reset_Iave_fifo(self):
+    def reset_IQave_fifo(self):
         pass
 
     @command()
-    def read_Iave(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
+    def read_IQave(self):
+        return self.client.recv_array(512, dtype='int32', check_type=False)
 
     @command()
-    def read_24_Iave(self):
-        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
+    def read_24_IQave(self):
+        return self.client.recv_array(24, dtype='int32', check_type=False)
 
     @command()
-    def read_available_Iave(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
+    def read_available_IQave(self):
+        return self.client.recv_array(512, dtype='int32', check_type=False)
 
-    @command()
-    def get_Qave_fifo_occupancy(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_Qave_fifo_length(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def reset_Qave_fifo(self):
-        pass
-
-    @command()
-    def read_Qave(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
-
-    @command()
-    def read_24_Qave(self):
-        return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
-
-    @command()
-    def read_available_Qave(self):
-        return self.client.recv_array(1024, dtype='int32', check_type=False)
 
 
 
@@ -120,6 +97,10 @@ class Nicola4Z(object):
 
     @command()
     def get_data(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_status(self):
         return self.client.recv_uint32()
 
     @command()
@@ -143,6 +124,10 @@ class Nicola4Z(object):
 
     @command()
     def set_led(self, value):
+        pass
+
+    @command()
+    def set_qpsk(self, value):
         pass
 
     @command()

@@ -39,13 +39,10 @@ memory:
     offset: '0x43C20000'
     range: 16K
 
-  - name: ave_i_fifo
+  - name: ave_iq_fifo
     offset: '0x43C30000'
-    range: 8K
+    range: 2K
 
-  - name: ave_q_fifo
-    offset: '0x43C40000'
-    range: 8K
 
 
   - name: ck_iic
@@ -66,7 +63,7 @@ control_registers:
   - ssb_tx_frequency
   - display_o
   - lcd
-  - QPSK
+  - qpsk
 
 
 
@@ -76,6 +73,7 @@ control_registers:
 status_registers:
   - forty_two
   - average_amplitude
+  - status
   - max_amplitude
   - ck_inner_io
   - data

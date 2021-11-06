@@ -76,7 +76,7 @@ set_property -dict { PACKAGE_PIN T17   IOSTANDARD LVCMOS33 } [get_ports { Uart_R
 set_property -dict { PACKAGE_PIN R18   IOSTANDARD LVCMOS33 } [get_ports { Uart_TX }]; #IO_L20N_T3_34 Sch=ck_io[33]
 set_property -dict { PACKAGE_PIN P18   IOSTANDARD LVCMOS33 } [get_ports { SRCS }]; #IO_L23N_T3_34 Sch=ck_io[34]
 set_property -dict { PACKAGE_PIN N17   IOSTANDARD LVCMOS33 } [get_ports { SDCS }]; #IO_L23P_T3_34 Sch=ck_io[35]
-set_property -dict { PACKAGE_PIN M17   IOSTANDARD LVCMOS33 } [get_ports { LCD[2] }]; #IO_L8P_T1_AD10P_35 Sch=ck_io[36]
+set_property -dict { PACKAGE_PIN M17   IOSTANDARD LVCMOS33 } [get_ports { TestOut }]; #IO_L8P_T1_AD10P_35 Sch=ck_io[36]
 set_property -dict { PACKAGE_PIN L17   IOSTANDARD LVCMOS33 } [get_ports { LCD[3] }]; #IO_L11N_T1_SRCC_35 Sch=ck_io[37]
 set_property -dict { PACKAGE_PIN H17   IOSTANDARD LVCMOS33 } [get_ports { LCD[4] }]; #IO_L13N_T2_MRCC_35 Sch=ck_io[38]
 set_property -dict { PACKAGE_PIN H18   IOSTANDARD LVCMOS33 } [get_ports { LCD[5] }]; #IO_L14N_T2_AD4N_SRCC_35 Sch=ck_io[39]

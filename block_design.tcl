@@ -1,6 +1,7 @@
 # Add PS and AXI Interconnect
 set board_preset $board_path/config/board_preset.tcl
-source $project_path/fpga/lib/starting_point_withUart.tcl
+#source $project_path/fpga/lib/starting_point_withUart.tcl - couldn't enable uart1 !?
+source $sdk_path/fpga/lib/starting_point.tcl
 
 # Add config and status registers
 source $sdk_path/fpga/lib/ctl_sts.tcl
@@ -24,6 +25,7 @@ create_bd_port -dir O RST
 create_bd_port -dir O LCD_RS
 create_bd_port -dir O LCD_CS
 create_bd_port -dir O TP_CS
+create_bd_port -dir O TestOut
 
 # create_bd_port -dir O LCD_E
 # create_bd_port -dir O LCD_RW
@@ -50,8 +52,10 @@ create_bd_port -dir O user_spi_sck
 create_bd_port -dir I user_spi_miso 
 
 #Connect UART pins
-connect_port_pin Uart_RX ps_0/UART1_RX
-connect_port_pin Uart_TX ps_0/UART1_TX
+#PS uart1 did not enable
+#connect_port_pin Uart_RX ps_0/UART1_RX
+#connect_port_pin Uart_TX ps_0/UART1_TX
+#see AXI uartlite instance below
 
 # Connect LEDs to config register
 connect_port_pin led0 [get_slice_pin ctl/led 2 0]
@@ -64,6 +68,8 @@ connect_port_pin user_dio [get_slice_pin [ctl_pin user_io] 6 0]
 
 
 connect_pin [sts_pin ck_inner_io] ctl/ssb_tx_frequency
+
+
 
 
 #Create clock for DAC, data output
@@ -191,6 +197,24 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
 # Use AXI Stream clock converter (ADC clock -> FPGA clock)
 set intercon_idx 0
 
+#add AXI uartlite
+#(first add an axi interconnect allocation):
+set idx [add_master_interface $intercon_idx]
+
+cell xilinx.com:ip:axi_uartlite:2.0 axi_uartlite_0 {
+C_BAUDRATE 115200
+} {
+  s_axi_aclk [set ps_clk$intercon_idx]
+  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
+
+}
+
+#Now connect up
+connect_port_pin Uart_RX axi_uartlite_0/rx
+connect_port_pin Uart_TX axi_uartlite_0/tx
+
+
 
 # Define CIC parameters
 
@@ -236,9 +260,8 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_q {
 
 }
 
-
-#BT mic input (first add an axi interconnect allocation):
 set idx [add_master_interface $intercon_idx]
+#BT mic input 
 cell xilinx.com:ip:axi_fifo_mm_s:4.1 tx_axis_fifo {
   C_USE_RX_DATA 0
   C_USE_TX_CTRL 0
@@ -447,6 +470,7 @@ NBITS 24
  ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 17 0] 
  amplitude [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
+ iq [get_slice_pin ctl/qpsk 1 0]
 }
 
 #cell GN:user:photodiode_delay:1.0 pd_delays {
@@ -563,20 +587,6 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
 
 
 
-set idx [add_master_interface $intercon_idx]
-cell xilinx.com:ip:axi_fifo_mm_s:4.1 i_ave_fifo {
-  C_USE_TX_DATA 0
-  C_USE_TX_CTRL 0
-  C_USE_RX_CUT_THROUGH true
-  C_RX_FIFO_DEPTH 1024
-  C_RX_FIFO_PF_THRESHOLD 1000
-} {
-  s_axi_aclk [set ps_clk$intercon_idx]
-  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
-  axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
-  axi_str_rxd_tdata   adc_clock_converter_i/m_axis_tdata
-}
 
 
 
@@ -604,23 +614,25 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
   m_axis_aclk [set ps_clk$intercon_idx]
 }
 
-
+#Output the bitclock (toggles state every 64ms or 8 x qpsk monitor periods) to a status register and a port pin
+connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 31]] padded_status]
+connect_port_pin TestOut q_averaged/bitclock
 
 set idx [add_master_interface $intercon_idx]
-cell xilinx.com:ip:axi_fifo_mm_s:4.1 q_ave_fifo {
+#concat i and q data
+cell xilinx.com:ip:axi_fifo_mm_s:4.1 iq_ave_fifo {
   C_USE_TX_DATA 0
   C_USE_TX_CTRL 0
   C_USE_RX_CUT_THROUGH true
-  C_RX_FIFO_DEPTH 1024
-  C_RX_FIFO_PF_THRESHOLD 1000
+  C_RX_FIFO_DEPTH 512
+  C_RX_FIFO_PF_THRESHOLD 500
 } {
   s_axi_aclk [set ps_clk$intercon_idx]
   s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
   S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
-  axi_str_rxd_tvalid adc_clock_converter_q/m_axis_tvalid
-  axi_str_rxd_tdata   adc_clock_converter_q/m_axis_tdata
+  axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
+  axi_str_rxd_tdata   [get_concat_pin [list [get_slice_pin adc_clock_converter_i/m_axis_tdata 25 10] [get_slice_pin adc_clock_converter_q/m_axis_tdata 25 10] ] IQdata]
 }
-
 
 
 
@@ -694,15 +706,15 @@ set memory_segment_tx  [get_bd_addr_segs /${::ps_name}/Data/SEG_tx_axis_fifo_Mem
 set_property offset [get_memory_offset tx_fifo] $memory_segment_tx
 set_property range  [get_memory_range tx_fifo]  $memory_segment_tx
 
-assign_bd_address [get_bd_addr_segs i_ave_fifo/S_AXI/Mem0]
-set memory_segment_i_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_i_ave_fifo_Mem0]
-set_property offset [get_memory_offset ave_i_fifo] $memory_segment_i_ave
-set_property range  [get_memory_range ave_i_fifo]  $memory_segment_i_ave
+assign_bd_address [get_bd_addr_segs iq_ave_fifo/S_AXI/Mem0]
+set memory_segment_iq_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_iq_ave_fifo_Mem0]
+set_property offset [get_memory_offset ave_iq_fifo] $memory_segment_iq_ave
+set_property range  [get_memory_range ave_iq_fifo]  $memory_segment_iq_ave
 
-assign_bd_address [get_bd_addr_segs q_ave_fifo/S_AXI/Mem0]
-set memory_segment_q_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
-set_property offset [get_memory_offset ave_q_fifo] $memory_segment_q_ave
-set_property range  [get_memory_range ave_q_fifo]  $memory_segment_q_ave
+#assign_bd_address [get_bd_addr_segs q_ave_fifo/S_AXI/Mem0]
+#set memory_segment_q_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
+#set_property offset [get_memory_offset ave_q_fifo] $memory_segment_q_ave
+#set_property range  [get_memory_range ave_q_fifo]  $memory_segment_q_ave
 
 
 
@@ -740,4 +752,4 @@ set_property range  [get_memory_range ave_q_fifo]  $memory_segment_q_ave
   connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
   connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
 
-  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt ] ] 
+  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt axi_uartlite_0/interrupt ] ] 
