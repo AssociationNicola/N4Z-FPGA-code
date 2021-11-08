@@ -711,6 +711,12 @@ set memory_segment_iq_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_iq_ave_fifo_
 set_property offset [get_memory_offset ave_iq_fifo] $memory_segment_iq_ave
 set_property range  [get_memory_range ave_iq_fifo]  $memory_segment_iq_ave
 
+#Add these asignments to try and get Uart1 to work
+assign_bd_address [get_bd_addr_segs axi_uartlite_0/S_AXI/Reg]
+set memory_segment_axi_uart  [get_bd_addr_segs /${::ps_name}/Data/SEG_axi_uartlite_0_Reg]
+set_property offset [get_memory_offset axi_uart] $memory_segment_axi_uart
+set_property range  [get_memory_range axi_uart]  $memory_segment_axi_uart
+
 #assign_bd_address [get_bd_addr_segs q_ave_fifo/S_AXI/Mem0]
 #set memory_segment_q_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_q_ave_fifo_Mem0]
 #set_property offset [get_memory_offset ave_q_fifo] $memory_segment_q_ave
