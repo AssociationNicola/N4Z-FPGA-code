@@ -100,10 +100,6 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
-    def get_status(self):
-        return self.client.recv_uint32()
-
-    @command()
     def get_pd(self):
         return self.client.recv_uint32()
 
@@ -150,6 +146,11 @@ class Nicola4Z(object):
     def set_ssb_tx_frequency(self, value):
         pass
 
+#Control bits: 0: (select USB),
+# 1: enable SSB output,
+#[2:3] select data for data fifo (RX): 0 SSB receive, 1 cordic, 2 phase slope, 3 I+Q after FIR
+#4 select input to FIRs: 0 from CICs, 1 from ARM TX fifo
+#5 select input to CICs: 0 from ADC 0 and downconvertor (set by local oscillator), 1 from ADC 1 (Mic input)
     @command()
     def set_control(self, value):
         self.control_val=value
@@ -176,7 +177,7 @@ class Nicola4Z(object):
         self.set_control(self.control_val)
 
 #Note to go properly in to TX mode, need to set_FIR_in_val to 1 as well and return to zero to return to RX
-#This just enables the ssb modulator)
+#This just enables the ssb modulator (bit 1)
     def set_TX_High(self, value):
         value=(value&1) << 1
 
@@ -184,18 +185,49 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
-#This sets TX mode, need to set_FIR_in_val to 1 to use data from TX fifo and enables ssb modulator
-    def set_TX_Mode(self):
+#Sets side band 0=LSB, 1=USB
+    def set_SSB(self, value):
+        value=(value&1)
 
-        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
+        self.control_val=self.control_val & (2**32 -1 -1)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+
+
+#This sets TX mode, need to set_FIR_in_val to 1 to use data from TX fifo and enables ssb modulator
+#Ensures bits 1 and 4 are set to transmit from ARM data (eg from BT mic)
+#Doesn't change the side band selected
+    def set_TX_Mode_ARM(self):
+
+#        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
         self.control_val=self.control_val | 2+2**4
         self.set_control(self.control_val)
 
+#This sets TX mode, need to set_FIR_in_val to 0 and CIC input to transmit from ADC 1 direct input (microphone) and enables ssb modulator
+#Ensures bits 1 and 5 are set and bit 4 is reset
+#Doesn't change the side band selected
+    def set_TX_Mode_Mic(self):
+
+        self.control_val=self.control_val & (2**32 -1 -2**4)
+        self.control_val=self.control_val | 2 + 2**5
+        self.set_control(self.control_val)
+
 #This sets RX mode, sets_FIR_in_val to 0 to use data from ADC and disables ssb modulator (resets bits 1 and 4 to zero)
+#resets bits 1,2,3,4 and 5 to zero (disable SSB modulator and input to FIR from CIC and CIC from the antenna input to the ADC0 also set data stream to ARM fo be from the SSB demod)
+#The side band mode is not changed (bit 0)
     def set_RX_Mode(self):
 
-        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
+        self.control_val=self.control_val & (2**32 -1 -2 -2**2 -2**3 -2**4 -2**5)
         self.set_control(self.control_val)
+
+    def set_data_RX_value(self,value):
+	    value=(value&3) << 2
+
+        self.control_val=self.control_val & (2**32 -1-2**2 -2**3)  #first reset the bits in question
+        self.control_val=self.control_val | value	  #then set them	
+        self.set_control(self.control_val)
+
 
 
 

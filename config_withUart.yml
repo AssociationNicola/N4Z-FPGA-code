@@ -10,9 +10,7 @@ cores:
   - fpga/cores/latched_mux_v1_0
   - fpga/cores/axis_constant_v1_0
   - fpga/cores/axis_lfsr_v1_0
-  - fpga/cores/pdm_v1_0
 
-  - ./cores/OB_DAC_v1_0
   - ./cores/ad5541_v1_0
   - ./cores/edge_detector_v1_0
   - ./cores/i2s_rx_v1_0
@@ -70,7 +68,6 @@ control_registers:
   - display_o
   - lcd
   - qpsk
-  - volume
 
 
 
@@ -83,6 +80,7 @@ status_registers:
   - status
   - max_amplitude
   - ck_inner_io
+  - data
   - display_i
 
 
@@ -95,7 +93,6 @@ parameters:
   cic_decimation_rate: 5
   fir_decimation_rate: 5
   cic_n_stages: 6
-  pwm_width: 12
 
 
 xdc:
@@ -105,7 +102,7 @@ xdc:
 
 drivers:
   - server/drivers/common.hpp
-#  - server/drivers/xadc.hpp
+    #- boards/cora07s/drivers/xadc.hpp
     #- boards/cora07s/drivers/pmod.hpp
   - ./dds.hpp
   - ./n4z.hpp

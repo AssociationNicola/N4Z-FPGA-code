@@ -26,8 +26,6 @@ create_bd_port -dir O LCD_RS
 create_bd_port -dir O LCD_CS
 create_bd_port -dir O TP_CS
 create_bd_port -dir O TestOut
-create_bd_port -dir O audio_speaker
-create_bd_port -dir O Volume
 
 # create_bd_port -dir O LCD_E
 # create_bd_port -dir O LCD_RW
@@ -137,16 +135,7 @@ Data  CS5340_SDout
 }
 
 
-
-
-# Add XADC for battery and antenna current monitoring - actually adc module should already be added!
-#source $sdk_path/fpga/lib/xadc.tcl
-#add_xadc xadc
-
-
-# Use AXI Stream clock converter (ADC clock -> FPGA clock)
-set intercon_idx 0
-
+#Insert stuff from decimator
 
 
 
@@ -205,6 +194,9 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
 
 
 
+# Use AXI Stream clock converter (ADC clock -> FPGA clock)
+set intercon_idx 0
+
 #add AXI uartlite
 #(first add an axi interconnect allocation):
 set idx [add_master_interface $intercon_idx]
@@ -222,32 +214,6 @@ C_BAUDRATE 115200
 connect_port_pin Uart_RX axi_uartlite_0/rx
 connect_port_pin Uart_TX axi_uartlite_0/tx
 
-
-#Choose input to cic - either RX from antenna downconvert or audio from mic on ADC channel 2
-
-cell koheron:user:latched_mux:1.0 data_for_cic_i {
-            WIDTH 24
-    	    N_INPUTS 2
-            SEL_WIDTH 1
-        } {
-            clk  $adc_clk 
-            sel [get_slice_pin ctl/control 5 5]
-            clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 23 0]  [get_Q_pin [get_concat_pin [list [get_slice_pin adc_reader/Audio 31 16] [get_constant_pin 0 8]] concat_ADC1_24b] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
-
-        }
-
-cell koheron:user:latched_mux:1.0 data_for_cic_q {
-            WIDTH 24
-    	    N_INPUTS 2
-            SEL_WIDTH 1
-        } {
-            clk  $adc_clk 
-            sel [get_slice_pin ctl/control 5 5]
-            clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 47 24]  latched_mic_input/Q] cic_q_inputs ]
-
-        }
 
 
 # Define CIC parameters
@@ -269,8 +235,8 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_i {
   Use_Xtreme_DSP_Slice false
 } {
   aclk $adc_clk
-  s_axis_data_tvalid [get_Q_pin complex_mult/m_axis_dout_tvalid 1 noce $adc_clk delayed_tvalid]
-  s_axis_data_tdata data_for_cic_i/dout
+  s_axis_data_tvalid complex_mult/m_axis_dout_tvalid
+  s_axis_data_tdata [get_slice_pin complex_mult/m_axis_dout_tdata 23 0]
 
 
 }
@@ -288,8 +254,8 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_q {
   Use_Xtreme_DSP_Slice false
 } {
   aclk $adc_clk
-  s_axis_data_tvalid delayed_tvalid/Q
-  s_axis_data_tdata data_for_cic_q/dout
+  s_axis_data_tvalid complex_mult/m_axis_dout_tvalid
+  s_axis_data_tdata [get_slice_pin complex_mult/m_axis_dout_tdata 47 24]
 
 
 }
@@ -578,32 +544,6 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter {
 }
 
 
-#Add audio output to one bit dac
-cell GN:user:OB_DAC:1.0 Audio_Speaker {
-
-} {
-  i_clk [set ps_clk$intercon_idx]
-  i_res [set rst${intercon_idx}_name]/peripheral_aresetn
-  i_ce  [get_constant_pin 1 1]
-  i_func [get_slice_pin adc_clock_converter/m_axis_tdata 31 16]
-  o_DAC audio_speaker
-}
-
-
-#Volume output
-cell koheron:user:pdm:1.0 volume_pwm {
-        NBITS [get_parameter pwm_width]
-    } {
-        clk [set ps_clk$intercon_idx]
-        rst [set rst${intercon_idx}_name]/peripheral_reset
-    }
-
-
-#Connect output to volume pin and input from volume_control register
-connect_pin Volume volume_pwm/dout
-connect_pin volume_pwm/din [get_slice_pin ctl/volume 12 0]
-
-
 
 
 # Add AXI stream FIFO
@@ -674,11 +614,9 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
   m_axis_aclk [set ps_clk$intercon_idx]
 }
 
-#Output the bitclock (counts up to 16 x qpsk monitor periods, so rising edge of bit 2 could be used as 64ms period clock - or toggle of bit 3 for transmit)
-#send to a status register and a port pin
-#use bit 0 toggling to grab the I/Q values when receiveing
-connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 28]] padded_status]
-connect_port_pin TestOut [get_slice_pin q_averaged/bitclock 3 3]
+#Output the bitclock (toggles state every 64ms or 8 x qpsk monitor periods) to a status register and a port pin
+connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 31]] padded_status]
+connect_port_pin TestOut q_averaged/bitclock
 
 set idx [add_master_interface $intercon_idx]
 #concat i and q data
@@ -698,7 +636,7 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 iq_ave_fifo {
 
 
 
-#These following bits to DAC module are only for interest during development and should be removed for final version
+
 #Convert the signed number to an offset unsigned number for the DAC (only use lowest 16 bits)
 cell xilinx.com:ip:c_addsub:12.0 twos_Comp_Unsigned {
 B_Width.VALUE_SRC USER 
@@ -748,10 +686,7 @@ connect_port_pin pmod_jb [get_concat_pin [list dac_out/cs dac_out/din dac_out/ld
 #Connect output of mux to input of DAC module
 connect_pin dac_out/data  dac0_mux/dout
 
-#Remove DAC to here
-
-
-
+#connect_port_pin Button_Active [get_slice_pin ctl/control 31 31]
 
 
 connect_port_pin CS5340_NRST proc_sys_reset_0/peripheral_aresetn

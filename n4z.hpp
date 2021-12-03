@@ -53,9 +53,6 @@ class Nicola4Z
         return sts.read<reg::dna, uint64_t>();
     }
 
-    uint32_t get_data() {
-        return sts.read<reg::data>();
-    }
 
     uint32_t get_status() {
         return sts.read<reg::status>();
@@ -106,6 +103,10 @@ class Nicola4Z
 
     void set_qpsk(uint32_t value) {
         ctl.write<reg::qpsk>(value);
+    }
+
+    void set_volume(uint32_t value) {
+        ctl.write<reg::volume>(value);
     }
 
     void set_user_io(uint32_t value) {

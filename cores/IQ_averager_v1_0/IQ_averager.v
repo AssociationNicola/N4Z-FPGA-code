@@ -14,7 +14,7 @@ parameter STOPAT = 320
   input rst,
   input signed [NBITS-1:0] amplitude,
   output signed [NBITS-1:0] average,
-  output bitclock,
+  output [3:0] bitclock,
   output valid
 
 );   
@@ -26,7 +26,7 @@ parameter STOPAT = 320
    
 	assign average = accumulator[NBITS+ABITS-1:ABITS];
 	assign valid = (counter == STOPAT) && (load_val ==1);
-        assign bitclock = bit_counter[3];
+        assign bitclock = bit_counter;
 
 
   always @(posedge clk) begin
