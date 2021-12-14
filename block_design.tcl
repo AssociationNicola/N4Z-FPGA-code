@@ -233,7 +233,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_i {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 23 0]  [get_Q_pin [get_concat_pin [list [get_slice_pin adc_reader/Audio 31 16] [get_constant_pin 0 8]] concat_ADC1_24b] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
+            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 23 0]  [get_Q_pin [get_concat_pin [list [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 16] ] signextend_ADC1_24b] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
 
         }
 
@@ -582,7 +582,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter {
 cell GN:user:OB_DAC:1.0 Audio_Speaker {
 
 } {
-  i_clk [set ps_clk$intercon_idx]
+  i_clk clk_wiz_0/clk_out1
   i_res [set rst${intercon_idx}_name]/peripheral_aresetn
   i_ce  [get_constant_pin 1 1]
   i_func [get_slice_pin adc_clock_converter/m_axis_tdata 31 16]
