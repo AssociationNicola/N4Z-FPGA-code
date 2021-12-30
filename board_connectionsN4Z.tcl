@@ -4,8 +4,8 @@
 #Note inner (inputs) is the outer row and outer (outputs) is the inner row on the board
 #  set ck_outer_io [ create_bd_port -dir O -from 15 -to 0 ck_outer_io ]
 
-  set led0 [ create_bd_port -dir O -from 2 -to 0 led0 ]
-  set led1 [ create_bd_port -dir O -from 2 -to 0 led1 ]
+#  set led0 [ create_bd_port -dir O -from 2 -to 0 led0 ]
+#  set led1 [ create_bd_port -dir O -from 2 -to 0 led1 ]
 #  set spi_clk_i [ create_bd_port -dir I spi_clk_i ]
 #  set spi_clk_o [ create_bd_port -dir O spi_clk_o ]
 #  set spi_csn_i [ create_bd_port -dir I -from 0 -to 0 spi_csn_i ]
@@ -14,7 +14,7 @@
 #  set spi_sdo_i [ create_bd_port -dir I spi_sdo_i ]
 #  set spi_sdo_o [ create_bd_port -dir O spi_sdo_o ]
 #Unpopulated J1 connector pins are outputs
-  set user_dio [ create_bd_port -dir O -from 11 -to 0 user_dio ]
+#  set user_dio [ create_bd_port -dir O -from 11 -to 0 user_dio ]
 
   set Vp_Vn_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_analog_io_rtl:1.0 Vp_Vn_0 ]
 
@@ -50,6 +50,14 @@
     s_axi_aresetn proc_sys_reset_0/peripheral_aresetn
     Vp_Vn Vp_Vn_0
   }
+
+
+  set_cell_props ps_0 {
+    PCW_USE_FABRIC_INTERRUPT {1} 
+    PCW_IRQ_F2P_INTR {1}
+  }
+
+
 
 #  # Create instance: PWM_0, and set properties
 #  cell digilentinc.com:IP:PWM:2.0 PWM_0 {

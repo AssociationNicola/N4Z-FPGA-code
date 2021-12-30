@@ -51,13 +51,13 @@ memory:
 
 
 
-  - name: ck_iic
-    offset: '0x40005000'
-    range: 4K
+#  - name: ck_iic
+#    offset: '0x40005000'
+#    range: 4K
 
-  - name: axi_spi
-    offset: '0x40006000'
-    range: 4K
+#  - name: axi_spi
+#    offset: '0x40006000'
+#    range: 4K
 
 
 control_registers:
@@ -106,7 +106,7 @@ xdc:
 drivers:
   - server/drivers/common.hpp
 #  - server/drivers/xadc.hpp
-    #- boards/cora07s/drivers/pmod.hpp
+#- boards/cora07s/drivers/pmod.hpp
   - ./dds.hpp
   - ./n4z.hpp
 

@@ -1,7 +1,8 @@
   create_bd_intf_port -mode Master -vlnv xilinx.com:interface:iic_rtl:1.0 ck_iic 
   set btns [ create_bd_port -dir I -from 1 -to 0 btns ]
 
-  create_bd_port -dir O ck_spi_mosi 
+  
+create_bd_port -dir O ck_spi_mosi 
   create_bd_port -dir O ck_spi_ss 
   create_bd_port -dir O ck_spi_sck 
   create_bd_port -dir I ck_spi_miso 

@@ -1,0 +1,21 @@
+diff -rupN overlay.orig/pl.dtsi overlay/pl.dtsi
+--- overlay.orig/pl.dtsi	2021-03-16 19:18:53.390500719 +0000
++++ overlay/pl.dtsi	2021-03-16 19:13:01.785876971 +0000
+@@ -66,6 +66,17 @@
+ 				reg = <0x40006000 0x1000>;
+ 				xlnx,num-ss-bits = <0x1>;
+ 				xlnx,spi-mode = <0>;
++        spidev@0x00 {
++			    	compatible = "spidev";
++			    	spi-max-frequency = <0x4C4B40>;
++			    	reg = <0x0>;
++			    };
++
++			    spidev@0x01 {
++			    	compatible = "spidev";
++			    	spi-max-frequency = <0x4C4B40>;
++			    	reg = <0x1>;
++			    };
+ 			};
+ 			ctl_axi_ctl_register: axi_ctl_register@60000000 {
+ 				clock-names = "aclk";

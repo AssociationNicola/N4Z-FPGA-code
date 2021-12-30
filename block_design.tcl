@@ -6,7 +6,10 @@ source $sdk_path/fpga/lib/starting_point.tcl
 # Add config and status registers
 source $sdk_path/fpga/lib/ctl_sts.tcl
 add_ctl_sts
-source $project_path/board_connectionsN4Z_v2.tcl
+#source $project_path/board_connectionsN4Z_v2.tcl
+#Dec 2021 revert to none spi version:
+source $project_path/board_connectionsN4Z.tcl
+
 source $board_path/analogue.tcl
 #source $board_path/pmods.tcl
 
@@ -48,10 +51,12 @@ create_bd_port -dir I CS5340_LRCLK
   set led0 [ create_bd_port -dir O -from 2 -to 0 led0 ]
   set led1 [ create_bd_port -dir O -from 2 -to 0 led1 ]
 
-create_bd_port -dir O user_spi_mosi 
-create_bd_port -dir O -from  1 -to 0 user_spi_ss
-create_bd_port -dir O user_spi_sck 
-create_bd_port -dir I user_spi_miso 
+
+#Dec 2021 remove spi interface
+# create_bd_port -dir O user_spi_mosi 
+#create_bd_port -dir O -from  1 -to 0 user_spi_ss
+#create_bd_port -dir O user_spi_sck 
+#create_bd_port -dir I user_spi_miso 
 
 #Connect UART pins
 #PS uart1 did not enable
@@ -805,22 +810,26 @@ set_property range  [get_memory_range axi_uart]  $memory_segment_axi_uart
 
 #move_bd_cells [get_bd_cells ctl]  [get_bd_cells slice_15_0_ctl_ck_outer_io] [get_bd_cells slice_12_0_ctl_user_io]
   # Create instance: axi_spi, and set properties
-  cell xilinx.com:ip:axi_quad_spi:3.2 axi_spi0 {
-   C_USE_STARTUP {0} 
-   C_USE_STARTUP_INT {0} 
-  } {
-    AXI_LITE axi_mem_intercon_0/M[add_master_interface]_AXI
-    ext_spi_clk $ps_name/FCLK_CLK0
-    s_axi_aclk $ps_name/FCLK_CLK0
-    s_axi_aresetn proc_sys_reset_0/peripheral_aresetn
-  }
-  create_bd_addr_seg -range [get_memory_range axi_spi] -offset [get_memory_offset axi_spi] [get_bd_addr_spaces ps_0/Data] [get_bd_addr_segs axi_spi0/AXI_LITE/Reg] SEG_axi_spi0_Reg
-  connect_bd_net [get_bd_ports user_spi_sck] [get_bd_pins axi_spi0/sck_o]
-  connect_bd_net [get_bd_pins axi_spi0/sck_i] [get_bd_pins axi_spi0/sck_o]
-  connect_bd_net [get_bd_ports user_spi_ss] [get_bd_pins axi_spi0/ss_o]
-  connect_bd_net [get_bd_pins axi_spi0/ss_i] [get_bd_pins axi_spi0/ss_o]
-  connect_bd_net [get_bd_pins axi_spi0/io1_i] [get_bd_ports user_spi_miso] 
-  connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
-  connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
 
-  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt axi_uartlite_0/interrupt ] ] 
+#Dec 2021 remove spi components !!!!!!!!!!!!!!!
+
+#  cell xilinx.com:ip:axi_quad_spi:3.2 axi_spi0 {
+#   C_USE_STARTUP {0} 
+#   C_USE_STARTUP_INT {0} 
+#  } {
+#    AXI_LITE axi_mem_intercon_0/M[add_master_interface]_AXI
+#    ext_spi_clk $ps_name/FCLK_CLK0
+#    s_axi_aclk $ps_name/FCLK_CLK0
+#    s_axi_aresetn proc_sys_reset_0/peripheral_aresetn
+#  }
+#  create_bd_addr_seg -range [get_memory_range axi_spi] -offset [get_memory_offset axi_spi] [get_bd_addr_spaces ps_0/Data] [get_bd_addr_segs axi_spi0/AXI_LITE/Reg] SEG_axi_spi0_Reg
+#  connect_bd_net [get_bd_ports user_spi_sck] [get_bd_pins axi_spi0/sck_o]
+#  connect_bd_net [get_bd_pins axi_spi0/sck_i] [get_bd_pins axi_spi0/sck_o]
+#  connect_bd_net [get_bd_ports user_spi_ss] [get_bd_pins axi_spi0/ss_o]
+#  connect_bd_net [get_bd_pins axi_spi0/ss_i] [get_bd_pins axi_spi0/ss_o]
+#  connect_bd_net [get_bd_pins axi_spi0/io1_i] [get_bd_ports user_spi_miso] 
+#  connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
+#  connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
+
+connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt  data_axis_fifo/interrupt tx_axis_fifo/interrupt iq_ave_fifo/interrupt axi_uartlite_0/interrupt ] ]
+#removed Dec 2021: axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt - then remove entirely as there won't be an interrupt input!
