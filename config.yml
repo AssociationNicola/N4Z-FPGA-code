@@ -59,7 +59,7 @@ memory:
     offset: '0x40006000'
     range: 4K
 
-
+#agc_value has 2 16 bit values used as gain in the multipliers
 control_registers:
   - led
   - average
@@ -71,6 +71,7 @@ control_registers:
   - lcd
   - qpsk
   - volume
+  - agc_value
 
 
 

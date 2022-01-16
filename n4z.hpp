@@ -109,6 +109,10 @@ class Nicola4Z
         ctl.write<reg::volume>(value);
     }
 
+    void set_agc_value(uint32_t value) {
+        ctl.write<reg::agc_value>(value);
+    }
+
     void set_user_io(uint32_t value) {
         ctl.write<reg::user_io>(value);
     }

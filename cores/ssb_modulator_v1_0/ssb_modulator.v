@@ -4,7 +4,7 @@
 //The SSB frequency is the clock frequency times the ssb_freq value divided by 2**(24+3), so with a clock of 8*8.192MHz (clock has been increased to reduce jitter)
 //for 87kHz ssb_freq should be 178176 (ie freqx2.048)
 //Max frequency that can be generated with that clock fequency is ~128kHz
-// Max amplitude is 2**22, so scale so that 2*22 is not exceeded (ie bit 23 should be zero, so that max value is in fact 2**22-1).
+// Max amplitude is 2**25-2**20 (testing dec 2021), (?????so scale so that 2*22 is not exceeded (ie bit 23 should be zero, so that max value is in fact 2**22-1)????).
 //Frequency shift is delta_phase * clock frequency/2**24, so with 8.192MHz for 1kHz shift, need deltaphase of 2048 (max value is 2^13-1, ie 8191 (about 4kHz offset)
 
 module ssb_modulator #

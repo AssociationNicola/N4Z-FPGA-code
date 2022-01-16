@@ -27,7 +27,7 @@ module ssb_modulator_tb();
     
   );
 
-  parameter CLK_PERIOD = 10;
+  parameter CLK_PERIOD = 16;
 
 
 
@@ -37,14 +37,15 @@ module ssb_modulator_tb();
     stdby=0;
     iq = 0;  
 	  #(10*CLK_PERIOD) delta_phase = 0;
-	  ssb_freq=2**15;
-	  amplitude=2**21;
+	  ssb_freq=178176;
+	  amplitude=65000000;
 	  #(1*CLK_PERIOD) rst = 0;
-	  #(1500*CLK_PERIOD) amplitude=2**21;
-	  #(10000*CLK_PERIOD) delta_phase = 2**10;
+	  #(1500*CLK_PERIOD) amplitude=32500000;
+	  #(100000*CLK_PERIOD) delta_phase = 0* 2**10;
 
 	  #(10000*CLK_PERIOD) iq=2;
 	  #(100*CLK_PERIOD) iq=1;
+	  amplitude=12500000;
 	  #(10000*CLK_PERIOD) iq=3;
 	  #(100*CLK_PERIOD) iq=1;
 	  #(10000*CLK_PERIOD) iq=3;

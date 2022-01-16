@@ -183,11 +183,14 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
     }
 
 
+#Jan 2022 overhall bit widths to get levels right and use an AGC between CIC and FIR and between FIR and Cordic
+
+#2022 Output width 24>17 (only use lowest 16)
 # Maybe need to strobe tvalid with [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ] and use LeftValid/res or something for the clock convertor - but then what is the clock convertor for? Maybe it should be used after FIR??
   cell xilinx.com:ip:cmpy:6.0 complex_mult {
       APortWidth 16
       BPortWidth 16
-      OutputWidth 24
+      OutputWidth 17
       OptimizeGoal Performance
       RoundMode Random_Rounding
   } {
@@ -222,34 +225,34 @@ C_BAUDRATE 115200
 connect_port_pin Uart_RX axi_uartlite_0/rx
 connect_port_pin Uart_TX axi_uartlite_0/tx
 
-
+#2022 Widths 24>16 on mux inputs
 #Choose input to cic - either RX from antenna downconvert or audio from mic on ADC channel 2
 
 cell koheron:user:latched_mux:1.0 data_for_cic_i {
-            WIDTH 24
+            WIDTH 16
     	    N_INPUTS 2
             SEL_WIDTH 1
         } {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 23 0]  [get_Q_pin [get_concat_pin [list [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 31] [get_slice_pin adc_reader/Audio 31 16] ] signextend_ADC1_24b] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
+            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 15 0]  [get_Q_pin [get_slice_pin adc_reader/Audio 31 16] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
 
         }
 
 cell koheron:user:latched_mux:1.0 data_for_cic_q {
-            WIDTH 24
+            WIDTH 16
     	    N_INPUTS 2
             SEL_WIDTH 1
         } {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 47 24]  latched_mic_input/Q] cic_q_inputs ]
+            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 32 17]  latched_mic_input/Q] cic_q_inputs ]
 
         }
 
-
+#2022 widths 24/32 > 16/24
 # Define CIC parameters
 
 set diff_delay [get_parameter cic_differential_delay]
@@ -263,9 +266,9 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_i {
   Differential_Delay $diff_delay
   Input_Sample_Frequency [expr [get_parameter adc_clk] / 64000000.]
   Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
-  Input_Data_Width 24
+  Input_Data_Width 16
   Quantization Truncation
-  Output_Data_Width 32
+  Output_Data_Width 24
   Use_Xtreme_DSP_Slice false
 } {
   aclk $adc_clk
@@ -282,9 +285,9 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_q {
   Differential_Delay $diff_delay
   Input_Sample_Frequency [expr [get_parameter adc_clk] / 64000000.]
   Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
-  Input_Data_Width 24
+  Input_Data_Width 16
   Quantization Truncation
-  Output_Data_Width 32
+  Output_Data_Width 24
   Use_Xtreme_DSP_Slice false
 } {
   aclk $adc_clk
@@ -326,37 +329,110 @@ cell xilinx.com:ip:axis_clock_converter:1.1 tx_clock_converter {
   s_axis_aclk [set ps_clk$intercon_idx]
 }
 
+#2022 put AGC here controlled by ARM with level monitor after it. But will need a cordic to get the amplitude
+#Need to use a multiplier instead of a mux!
+#ERROR: [IP_Flow 19-3458] Validation failed for parameter 'Const Width(CONST_WIDTH)' for BD Cell 'const_v1_w0'. Value '0' is out of the range (1,4096)
+
+cell xilinx.com:ip:mult_gen:12.0 agc_cic_i {
+PortAType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 25 
+OutputWidthLow 10 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_slice_pin ctl/agc_value 15 0]
+        B  cic_i/m_axis_data_tdata
 
 
+}
+
+cell xilinx.com:ip:mult_gen:12.0 agc_cic_q {
+PortAType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 25 
+OutputWidthLow 10 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_slice_pin ctl/agc_value 31 16]
+        B  cic_i/m_axis_data_tdata
+
+
+}
+
+
+
+
+
+cell xilinx.com:ip:cordic:6.0 cordic_cic_level_mon {
+    Functional_Selection Translate
+    Pipelining_Mode Maximum
+    Phase_Format Scaled_Radians
+    Input_Width 16
+    Output_Width 16
+    Round_Mode Round_Pos_Neg_Inf
+} {
+    aclk  $adc_clk
+    s_axis_cartesian_tvalid cic_i/m_axis_data_tvalid
+    s_axis_cartesian_tdata [get_concat_pin [list agc_cic_i/P agc_cic_q/P] cic_iq_vals]
+
+}
+
+cell GN:user:averager:1.0 level_monitor_cic {
+
+} {
+clk $adc_clk
+next cordic_cic_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_Q_pin [get_slice_pin cordic_cic_level_mon/m_axis_dout_tdata 15 0] 1 cordic_cic_level_mon/m_axis_dout_tvalid $adc_clk cic_amplitude_latched ]
+}
+
+
+
+
+#mux options
+#[get_concat_pin [list [get_slice_pin cic_i/m_axis_data_tdata 22 7] [get_slice_pin cic_i/m_axis_data_tdata 21 6] [get_slice_pin cic_i/m_axis_data_tdata 20 5] [get_slice_pin cic_i/m_axis_data_tdata 19 4] [get_slice_pin cic_i/m_axis_data_tdata 18 3] [get_slice_pin cic_i/m_axis_data_tdata 17 2] [get_slice_pin cic_i/m_axis_data_tdata 16 1] [get_slice_pin cic_i/m_axis_data_tdata 15 0] ] cic_i_levels]
+
+
+#2022 widths 32 > 16 - note that only takes upper 16 bits from tx fifo
 
 cell koheron:user:latched_mux:1.0 data_for_fir_i {
-            WIDTH 32
+            WIDTH 16
     	    N_INPUTS 2
             SEL_WIDTH 1
         } {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 4 4]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list cic_i/m_axis_data_tdata  tx_clock_converter/m_axis_tdata] fir_i_inputs ]
+            din [get_concat_pin [list agc_cic_i/P  [get_slice_pin tx_clock_converter/m_axis_tdata 31 16]] fir_i_inputs ]
 
         }
 
 cell koheron:user:latched_mux:1.0 data_for_fir_q {
-            WIDTH 32
+            WIDTH 16
     	    N_INPUTS 2
             SEL_WIDTH 1
         } {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 4 4]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list cic_q/m_axis_data_tdata  tx_clock_converter/m_axis_tdata] fir_q_inputs ]
+            din [get_concat_pin [list agc_cic_q/P  [get_slice_pin tx_clock_converter/m_axis_tdata 31 16]] fir_q_inputs ]
 
         }
 
 
 
 
-
+#2022 widths 32/32/32 > 16/16/24
 
 set dec_rate_fir [get_parameter fir_decimation_rate]
 #Data input rate at 40kHz paced by the cic
@@ -382,10 +458,10 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_i {
   Filter_Type Decimation
   Sample_Frequency [expr [get_parameter adc_clk] / 1000000. / $dec_rate]
   Clock_Frequency [expr [get_parameter fclk0] / 1000000.]
-  Coefficient_Width 32
-  Data_Width 32
+  Coefficient_Width 16
+  Data_Width 16
   Output_Rounding_Mode Convergent_Rounding_to_Even
-  Output_Width 32
+  Output_Width 24
   Decimation_Rate $dec_rate_fir
   BestPrecision true
 
@@ -400,10 +476,10 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_q {
   Filter_Type Decimation
   Sample_Frequency [expr [get_parameter adc_clk] / 1000000. / $dec_rate]
   Clock_Frequency [expr [get_parameter fclk0] / 1000000.]
-  Coefficient_Width 32
-  Data_Width 32
+  Coefficient_Width 16
+  Data_Width 16
   Output_Rounding_Mode Convergent_Rounding_to_Even
-  Output_Width 32
+  Output_Width 24
   Decimation_Rate $dec_rate_fir
   BestPrecision true
 
@@ -414,24 +490,69 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_q {
   s_axis_data_tdata data_for_fir_q/dout
 }
 
+
+#Add AGC here (but don't need level monitor as this is done after the regular cordic used by ssb)
+cell xilinx.com:ip:mult_gen:12.0 agc_fir_i {
+PortAType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 25 
+OutputWidthLow 10 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_slice_pin ctl/agc_value 15 0]
+        B  fir_i/m_axis_data_tdata
+
+
+}
+
+cell xilinx.com:ip:mult_gen:12.0 agc_fir_q {
+PortAType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 25 
+OutputWidthLow 10 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_slice_pin ctl/agc_value 15 0]
+        B  fir_q/m_axis_data_tdata
+
+
+}
+
+
+
+
+
+
+
+#2022 widths 32>16
+
 cell xilinx.com:ip:c_addsub:12.0 c_addsub_0 {
 B_Width.VALUE_SRC USER 
 A_Width.VALUE_SRC USER 
 A_Type.VALUE_SRC USER
 
 Implementation Fabric 
-A_Width 32 
-B_Width 32 
+A_Width 16 
+B_Width 16 
 Add_Mode Add_Subtract 
-Out_Width 32 
+Out_Width 16 
 CE false 
-Out_Width 32 
 Latency 1 
-B_Value 00000000000000000000000000000000
+B_Value 0000000000000000
 
 } {
-A fir_i/m_axis_data_tdata
-B fir_q/m_axis_data_tdata
+A agc_fir_i/P
+B agc_fir_q/P
 CLK $adc_clk
 ADD [get_slice_pin ctl/control 0 0]
 }
@@ -442,13 +563,13 @@ cell xilinx.com:ip:cordic:6.0 cordic_ssb {
     Functional_Selection Translate
     Pipelining_Mode Maximum
     Phase_Format Scaled_Radians
-    Input_Width 32
+    Input_Width 16
     Output_Width 16
     Round_Mode Round_Pos_Neg_Inf
 } {
     aclk  $adc_clk
     s_axis_cartesian_tvalid fir_i/m_axis_data_tvalid
-    s_axis_cartesian_tdata [get_concat_pin [list fir_i/m_axis_data_tdata  fir_q/m_axis_data_tdata ] concat_audio_iq]
+    s_axis_cartesian_tdata [get_concat_pin [list agc_fir_i/P  agc_fir_q/P ] concat_audio_iq]
 
 }
 
@@ -467,7 +588,7 @@ Add_Mode Subtract
 Out_Width 17 
 CE false 
 Latency 1 
-B_Value 00000000000000000000000000000000
+B_Value 0000000000000000
 
 } {
 A [get_Q_pin [get_slice_pin cordic_ssb/m_axis_dout_tdata 31 16] 1 cordic_ssb/m_axis_dout_tvalid $adc_clk cordic_phase_latched_8k ]
@@ -476,7 +597,7 @@ CLK $adc_clk
 
 }
 
-#Insert averager here !!!!!!!!!!!!!!!!!!!!
+
 cell GN:user:averager:1.0 level_monitor {
 
 } {
@@ -487,11 +608,27 @@ amplitude [get_Q_pin [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] 1 cordic_
 }
 
 
-connect_pin [sts_pin average_amplitude] [get_concat_pin [list level_monitor/average [get_constant_pin 0 16]] padded_average]
-connect_pin [sts_pin max_amplitude] [get_concat_pin [list level_monitor/max_val [get_constant_pin 0 16]] padded_max]
+connect_pin [sts_pin average_amplitude] [get_concat_pin [list level_monitor/average level_monitor_cic/average] average_cic_fir]
+connect_pin [sts_pin max_amplitude] [get_concat_pin [list level_monitor/max_val level_monitor_cic/max_val] max_cic_fir]
 
 
-#clk_wiz_1/clk_out1 is at 8.192MHz ie 1024 (2^10) times 8kHz
+#Dec 21 insert mux to switch to fixed (2**25-2**20) QPSK amplitude when control bit 6 set to 1
+#SSB bit was "[get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]" but tried scaling a factor of 2 (dec 2021)
+cell koheron:user:latched_mux:1.0 amplitude_select {
+            WIDTH 28
+    	    N_INPUTS 2
+            SEL_WIDTH 1
+        } {
+            clk  clk_wiz_1/clk_out1
+            sel [get_slice_pin ctl/control 6 6]
+            clken [get_constant_pin 1 1]
+            din [get_Q_pin [get_concat_pin [list [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] padded_amplitude] [get_constant_pin 32500000 28]] amplitude_options ] 1 noce clk_wiz_1/clk_out1 latched_amp_options]
+
+        }
+
+
+
+#clk_wiz_1/clk_out1 is at 8x8.192MHz ie 8192 (2^13) times 8kHz
 #Amplitude adjusted 31/1/21 to get the maximum dynamic range from the SSB modulation
 
 
@@ -502,7 +639,7 @@ NBITS 24
  rst $rst_adc_clk_name/peripheral_reset
  delta_phase [get_slice_pin diff_phase/S 13 0] 
  ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 17 0] 
- amplitude [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]
+ amplitude [get_slice_pin amplitude_select/dout 26 0]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
  iq [get_slice_pin ctl/qpsk 1 0]
 }
@@ -556,7 +693,7 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 3 2]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list c_addsub_0/S cordic_ssb/m_axis_dout_tdata  [get_concat_pin [list diff_phase/S [get_constant_pin 0 15] ]  ] [get_concat_pin [list [get_slice_pin fir_i/m_axis_data_tdata 29 14] [get_slice_pin fir_q/m_axis_data_tdata 29 14]  ] i_and_q_data ] ] data_options ]
+            din [get_concat_pin [list c_addsub_0/S cordic_ssb/m_axis_dout_tdata  [get_concat_pin [list diff_phase/S [get_constant_pin 0 15] ]  ] [get_concat_pin [list [get_slice_pin fir_i/m_axis_data_tdata 23 8] [get_slice_pin fir_q/m_axis_data_tdata 23 8]  ] i_and_q_data ] ] data_options ]
 
         }
 
