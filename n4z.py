@@ -25,7 +25,7 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
-    def get_acquisition_status(self):
+    def get_status(self):
         return self.client.recv_uint32()
 
     @command()
@@ -135,6 +135,14 @@ class Nicola4Z(object):
         pass
 
     @command()
+    def set_volume(self, value):
+        pass
+
+    @command()
+    def set_agc_value(self, value):
+        pass
+
+    @command()
     def set_user_io(self, value):
         pass
 
@@ -193,14 +201,33 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
+#This sets what goes to the CIC
+#Sets state of bit 5 according to value (0 for antenna ADC and 1 for mic ADC)
+    def set_Mic_In(self,value):
+        value=(value&1) << 5
+
+        self.control_val=self.control_val & (2**32 -1-2**5)  #first reset the bit in question
+        self.control_val=self.control_val | value	  #then set them	
+        self.set_control(self.control_val)
+
+#This sets TX modulator to fixed amplitude for QPSK
+#Sets state of bit 6 according to value (0 for normal and 1 for QPSK modulation)
+    def qpsk_amp(self,value):
+        value=(value&1) << 6
+
+        self.control_val=self.control_val & (2**32 -1-2**6)  #first reset the bit in question
+        self.control_val=self.control_val | value	  #then set them	
+        self.set_control(self.control_val)
+
 
 
 #This sets TX mode, need to set_FIR_in_val to 1 to use data from TX fifo and enables ssb modulator
 #Ensures bits 1 and 4 are set to transmit from ARM data (eg from BT mic)
+#checks bit 5 is zero
 #Doesn't change the side band selected
     def set_TX_Mode_ARM(self):
 
-#        self.control_val=self.control_val & (2**32 -1 -2 -2**4)
+        self.control_val=self.control_val & (2**32 -1 -2**5)
         self.control_val=self.control_val | 2+2**4
         self.set_control(self.control_val)
 
@@ -221,8 +248,13 @@ class Nicola4Z(object):
         self.control_val=self.control_val & (2**32 -1 -2 -2**2 -2**3 -2**4 -2**5)
         self.set_control(self.control_val)
 
+#Choose what to stream from FPGA to ARM:
+#0 RX SSB demod
+#1 Cordic (amp, lowest 16 bits and phase, highest 16 bits)
+#2 Phase slope (zero padded to 32 bits)
+#3 Concatenated I and Q data after FIRs
     def set_data_RX_value(self,value):
-	    value=(value&3) << 2
+        value=(value&3) << 2
 
         self.control_val=self.control_val & (2**32 -1-2**2 -2**3)  #first reset the bits in question
         self.control_val=self.control_val | value	  #then set them	
