@@ -156,8 +156,8 @@ class Nicola4Z(object):
 
 #Control bits: 0: (select USB),
 # 1: enable SSB output,
-#[2:3] select data for data fifo (RX): 0 SSB receive, 1 cordic, 2 phase slope, 3 I+Q after FIR
-#4 select input to FIRs: 0 from CICs, 1 from ARM TX fifo
+#[2:3] select data for data fifo (RX): 0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
+#4 select input to FIRs: 0 from CIC agcs, 1 from ARM TX fifo (only top 16 bits)
 #5 select input to CICs: 0 from ADC 0 and downconvertor (set by local oscillator), 1 from ADC 1 (Mic input)
     @command()
     def set_control(self, value):
@@ -171,6 +171,7 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
+#data fifo in options:  0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
     def set_data_fifo_in_val(self, value):
         value=(value&3) << 2
         self.control_val=self.control_val & (2**32 -1 -2**3 -2**2)      
