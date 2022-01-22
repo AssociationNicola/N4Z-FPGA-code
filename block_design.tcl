@@ -694,13 +694,11 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 3 2]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list
-
- [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp]
-  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] 
-  concat_audio_iq/dout
-  [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq]
-
+            din [get_concat_pin [list \
+  [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp] \
+  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] \
+  concat_audio_iq/dout \
+  [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
  ] data_options ]
 
         }
@@ -879,7 +877,7 @@ cell koheron:user:latched_mux:1.0 dac0_mux {
             clk ps_0/fclk_clk0 
             sel [get_slice_pin ctl/control 16 16]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list  [get_slice_pin twos_Comp_Unsigned/S 15 0] [get_slice_pin ctl/user_io 15 0]]]
+            din [get_concat_pin [list  [get_slice_pin twos_Comp_Unsigned/S 15 0] [get_slice_pin ctl/user_io 15 0]] padded_unsignDAC]
 
         }
 
