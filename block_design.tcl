@@ -334,7 +334,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 tx_clock_converter {
 #ERROR: [IP_Flow 19-3458] Validation failed for parameter 'Const Width(CONST_WIDTH)' for BD Cell 'const_v1_w0'. Value '0' is out of the range (1,4096)
 
 cell xilinx.com:ip:mult_gen:12.0 agc_cic_i {
-PortAType Unsigned 
+PortBType Unsigned 
 PortAWidth 24 
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
@@ -345,14 +345,14 @@ PipeStages 3
         } {
 
         CLK $adc_clk
-        A  [get_slice_pin ctl/agc_value 31 16]
-        B  cic_i/m_axis_data_tdata
+        A  cic_i/m_axis_data_tdata
+        B  [get_slice_pin ctl/agc_value 31 16]
 
 
 }
 
 cell xilinx.com:ip:mult_gen:12.0 agc_cic_q {
-PortAType Unsigned 
+PortBType Unsigned 
 PortAWidth 24 
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
@@ -363,8 +363,8 @@ PipeStages 3
         } {
 
         CLK $adc_clk
-        A  [get_slice_pin ctl/agc_value 31 16]
-        B  cic_i/m_axis_data_tdata
+        A  cic_i/m_axis_data_tdata
+        B  [get_slice_pin ctl/agc_value 31 16]
 
 
 }
@@ -493,7 +493,7 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_q {
 
 #Add AGC here (but don't need level monitor as this is done after the regular cordic used by ssb)
 cell xilinx.com:ip:mult_gen:12.0 agc_fir_i {
-PortAType Unsigned 
+PortBType Unsigned 
 PortAWidth 24 
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
@@ -504,14 +504,14 @@ PipeStages 3
         } {
 
         CLK $adc_clk
-        A  [get_slice_pin ctl/agc_value 15 0]
-        B  fir_i/m_axis_data_tdata
+        A  fir_i/m_axis_data_tdata
+        B  [get_slice_pin ctl/agc_value 15 0]
 
 
 }
 
 cell xilinx.com:ip:mult_gen:12.0 agc_fir_q {
-PortAType Unsigned 
+PortBType Unsigned 
 PortAWidth 24 
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
@@ -522,8 +522,8 @@ PipeStages 3
         } {
 
         CLK $adc_clk
-        A  [get_slice_pin ctl/agc_value 15 0]
-        B  fir_q/m_axis_data_tdata
+        A  fir_q/m_axis_data_tdata
+        B  [get_slice_pin ctl/agc_value 15 0]
 
 
 }
@@ -684,6 +684,7 @@ connect_port_pin SSB_Out0 ssb_tx/DRV0
 connect_port_pin SSB_Out1 ssb_tx/DRV1 
 
 #These mux inputs should be on $adc_clk
+#Bit width of addsub is now 16bits
 set idx [add_master_interface $intercon_idx]
 cell koheron:user:latched_mux:1.0 data_for_fifo {
             WIDTH 32
@@ -693,7 +694,14 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 3 2]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list c_addsub_0/S cordic_ssb/m_axis_dout_tdata  [get_concat_pin [list diff_phase/S [get_constant_pin 0 15] ]  ] [get_concat_pin [list [get_slice_pin fir_i/m_axis_data_tdata 23 8] [get_slice_pin fir_q/m_axis_data_tdata 23 8]  ] i_and_q_data ] ] data_options ]
+            din [get_concat_pin [list
+
+ [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp]
+  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] 
+  concat_audio_iq/dout
+  [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq]
+
+ ] data_options ]
 
         }
 
@@ -716,13 +724,14 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter {
 
 
 #Add audio output to one bit dac
+#After rationalising bits (reducing signal to 16 bits) take RX audio from lower 16 bits!
 cell GN:user:OB_DAC:1.0 Audio_Speaker {
 
 } {
   i_clk clk_wiz_0/clk_out1
   i_res [set rst${intercon_idx}_name]/peripheral_aresetn
   i_ce  [get_constant_pin 1 1]
-  i_func [get_slice_pin adc_clock_converter/m_axis_tdata 31 16]
+  i_func [get_slice_pin adc_clock_converter/m_axis_tdata 15 0]
   o_DAC audio_speaker
 }
 
@@ -758,13 +767,14 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
   axi_str_rxd_tdata   adc_clock_converter/m_axis_tdata
 }
 
+#Take i from agc_cic_i/P and similarly q
 cell GN:user:IQ_averager:1.0 i_averaged {
-NBITS 32
+NBITS 16
 STOPAT 320
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
- amplitude cic_i/m_axis_data_tdata
+ amplitude agc_fir_i/P
  load_val cic_i/m_axis_data_tvalid
 
 }
@@ -772,7 +782,7 @@ STOPAT 320
 
 
 cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
-  TDATA_NUM_BYTES 4
+  TDATA_NUM_BYTES 2
 } {
   s_axis_tdata i_averaged/average
   s_axis_tvalid i_averaged/valid
@@ -788,12 +798,12 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
 
 
 cell GN:user:IQ_averager:1.0 q_averaged {
-NBITS 32
+NBITS 16
 STOPAT 320
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
- amplitude cic_q/m_axis_data_tdata
+ amplitude agc_fir_q/P
  load_val cic_q/m_axis_data_tvalid
 
 }
@@ -801,7 +811,7 @@ STOPAT 320
 
 
 cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
-  TDATA_NUM_BYTES 4
+  TDATA_NUM_BYTES 2
 } {
   s_axis_tdata q_averaged/average
   s_axis_tvalid q_averaged/valid
@@ -830,13 +840,14 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 iq_ave_fifo {
   s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
   S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
   axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
-  axi_str_rxd_tdata   [get_concat_pin [list [get_slice_pin adc_clock_converter_i/m_axis_tdata 25 10] [get_slice_pin adc_clock_converter_q/m_axis_tdata 25 10] ] IQdata]
+  axi_str_rxd_tdata   [get_concat_pin [list adc_clock_converter_i/m_axis_tdata  adc_clock_converter_q/m_axis_tdata  ] IQdata]
 }
 
 
 
 #These following bits to DAC module are only for interest during development and should be removed for final version
 #Convert the signed number to an offset unsigned number for the DAC (only use lowest 16 bits)
+#Only the lower 16 bits are sent from the data fifo mux!
 cell xilinx.com:ip:c_addsub:12.0 twos_Comp_Unsigned {
 B_Width.VALUE_SRC USER 
 A_Width.VALUE_SRC USER 
@@ -853,7 +864,7 @@ Latency 1
 B_Value 00000000000000000000000000000000
 
 } {
-A [get_slice_pin adc_clock_converter/m_axis_tdata 31 16]
+A [get_slice_pin adc_clock_converter/m_axis_tdata 15 0]
 B [get_constant_pin [expr {2**15}] 16]
 CLK ps_0/fclk_clk0 
 
