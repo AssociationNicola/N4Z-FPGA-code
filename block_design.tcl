@@ -363,7 +363,7 @@ PipeStages 3
         } {
 
         CLK $adc_clk
-        A  cic_i/m_axis_data_tdata
+        A  cic_q/m_axis_data_tdata
         B  [get_slice_pin ctl/agc_value 31 16]
 
 
