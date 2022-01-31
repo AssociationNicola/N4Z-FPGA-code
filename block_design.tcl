@@ -190,7 +190,7 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
   cell xilinx.com:ip:cmpy:6.0 complex_mult {
       APortWidth 16
       BPortWidth 16
-      OutputWidth 17
+      OutputWidth 16
       OptimizeGoal Performance
       RoundMode Random_Rounding
   } {
@@ -248,7 +248,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_q {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 32 17]  latched_mic_input/Q] cic_q_inputs ]
+            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 31 16]  latched_mic_input/Q] cic_q_inputs ]
 
         }
 
@@ -772,7 +772,7 @@ STOPAT 320
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
- amplitude agc_fir_i/P
+ amplitude agc_cic_i/P
  load_val cic_i/m_axis_data_tvalid
 
 }
@@ -801,7 +801,7 @@ STOPAT 320
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
- amplitude agc_fir_q/P
+ amplitude agc_cic_q/P
  load_val cic_q/m_axis_data_tvalid
 
 }
