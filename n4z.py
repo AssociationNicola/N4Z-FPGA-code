@@ -117,6 +117,10 @@ class Nicola4Z(object):
     def get_average_amplitude(self):
         return self.client.recv_uint32()
 
+    @command()
+    def get_average_mult(self):
+        return self.client.recv_uint32()
+
 
     @command()
     def set_led(self, value):
@@ -140,6 +144,10 @@ class Nicola4Z(object):
 
     @command()
     def set_agc_value(self, value):
+        pass
+
+    @command()
+    def set_mult_agc_value(self, value):
         pass
 
     @command()

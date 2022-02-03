@@ -72,6 +72,7 @@ control_registers:
   - qpsk
   - volume
   - agc_value
+  - mult_agc_value
 
 
 
@@ -81,13 +82,14 @@ control_registers:
 status_registers:
   - forty_two
   - average_amplitude
+  - average_mult
   - status
   - max_amplitude
   - ck_inner_io
   - display_i
 
 
-#The ADC runs at 200ksps and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker
+#The ADC runs at 200ksps, and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker. adc_clk however is 200kHz*64, ie 12.8MHz, but adc_clk below is still set to 200kHz as that is the rate at which the values are used from the dds!
 parameters:
   fclk0: 100000000 # FPGA clock speed in Hz
   adc_clk: 200000

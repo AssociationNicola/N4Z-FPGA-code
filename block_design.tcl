@@ -187,10 +187,12 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
 
 #2022 Output width 24>17 (only use lowest 16)
 # Maybe need to strobe tvalid with [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ] and use LeftValid/res or something for the clock convertor - but then what is the clock convertor for? Maybe it should be used after FIR??
+#Should be:         s_axis_a_tdata [get_concat_pin [list [get_slice_pin adc_reader/Audio 31 16] [get_constant_pin 0 16]] concat_ADC0]
+
   cell xilinx.com:ip:cmpy:6.0 complex_mult {
       APortWidth 16
       BPortWidth 16
-      OutputWidth 16
+      OutputWidth 24
       OptimizeGoal Performance
       RoundMode Random_Rounding
   } {
@@ -206,7 +208,73 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
 }
 
 
+#Add an AGC to adjust the i and q output levels from the multiplier to go to the cici and cicq (24>16)
 
+cell xilinx.com:ip:mult_gen:12.0 agc_mult_i {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_Q_pin [get_slice_pin complex_mult/m_axis_dout_tdata 23 0] 1 complex_mult/m_axis_dout_tvalid $adc_clk latched_mult_i_output]
+        B  [get_slice_pin ctl/mult_agc_value 15 0]
+
+
+}
+
+cell xilinx.com:ip:mult_gen:12.0 agc_mult_q {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_Q_pin [get_slice_pin complex_mult/m_axis_dout_tdata 47 24] 1 complex_mult/m_axis_dout_tvalid $adc_clk latched_mult_q_output]
+        B  [get_slice_pin ctl/mult_agc_value 15 0]
+
+
+}
+
+
+
+
+
+cell xilinx.com:ip:cordic:6.0 cordic_mult_level_mon {
+    Functional_Selection Translate
+    Pipelining_Mode Maximum
+    Phase_Format Scaled_Radians
+    Input_Width 16
+    Output_Width 16
+    Round_Mode Round_Pos_Neg_Inf
+} {
+    aclk  $adc_clk
+    s_axis_cartesian_tvalid [get_Q_pin complex_mult/m_axis_dout_tvalid 3 noce $adc_clk delayed_tvalid]
+    s_axis_cartesian_tdata [get_concat_pin [list agc_mult_i/P agc_mult_q/P] mult_iq_vals]
+
+}
+
+cell GN:user:averager:1.0 level_monitor_mult {
+
+} {
+clk $adc_clk
+next cordic_mult_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_Q_pin [get_slice_pin cordic_mult_level_mon/m_axis_dout_tdata 15 0] 1 cordic_mult_level_mon/m_axis_dout_tvalid $adc_clk mult_amplitude_latched ]
+}
+
+
+connect_pin [sts_pin average_mult] [get_concat_pin [list level_monitor_mult/average [get_constant_pin 0 16 ] ] average_mult]
 
 #add AXI uartlite
 #(first add an axi interconnect allocation):
@@ -236,7 +304,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_i {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 15 0]  [get_Q_pin [get_slice_pin adc_reader/Audio 31 16] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
+            din [get_concat_pin [list agc_mult_i/P  [get_Q_pin [get_slice_pin adc_reader/Audio 31 16] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
 
         }
 
@@ -248,7 +316,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_q {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list [get_slice_pin complex_mult/m_axis_dout_tdata 31 16]  latched_mic_input/Q] cic_q_inputs ]
+            din [get_concat_pin [list agc_mult_q/P  latched_mic_input/Q] cic_q_inputs ]
 
         }
 
@@ -272,7 +340,7 @@ cell xilinx.com:ip:cic_compiler:4.0 cic_i {
   Use_Xtreme_DSP_Slice false
 } {
   aclk $adc_clk
-  s_axis_data_tvalid [get_Q_pin complex_mult/m_axis_dout_tvalid 1 noce $adc_clk delayed_tvalid]
+  s_axis_data_tvalid [get_Q_pin complex_mult/m_axis_dout_tvalid 4 noce $adc_clk delayed_tvalid]
   s_axis_data_tdata data_for_cic_i/dout
 
 
@@ -339,8 +407,8 @@ PortAWidth 24
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
 Use_Custom_Output_Width true 
-OutputWidthHigh 25 
-OutputWidthLow 10 
+OutputWidthHigh 30 
+OutputWidthLow 15 
 PipeStages 3
         } {
 
@@ -357,8 +425,8 @@ PortAWidth 24
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
 Use_Custom_Output_Width true 
-OutputWidthHigh 25 
-OutputWidthLow 10 
+OutputWidthHigh 30 
+OutputWidthLow 15
 PipeStages 3
         } {
 
@@ -498,8 +566,8 @@ PortAWidth 24
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
 Use_Custom_Output_Width true 
-OutputWidthHigh 25 
-OutputWidthLow 10 
+OutputWidthHigh 30 
+OutputWidthLow 15
 PipeStages 3
         } {
 
@@ -516,8 +584,8 @@ PortAWidth 24
 PortBWidth 16 
 Multiplier_Construction Use_Mults 
 Use_Custom_Output_Width true 
-OutputWidthHigh 25 
-OutputWidthLow 10 
+OutputWidthHigh 30 
+OutputWidthLow 15
 PipeStages 3
         } {
 
@@ -686,6 +754,23 @@ connect_port_pin SSB_Out1 ssb_tx/DRV1
 #These mux inputs should be on $adc_clk
 #Bit width of addsub is now 16bits
 set idx [add_master_interface $intercon_idx]
+
+
+#Normal concat input:
+#            din [get_concat_pin [list \
+#  [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp] \
+#  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] \
+#  concat_audio_iq/dout \
+#  [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
+# ] data_options ]
+#Test inputs:
+#  adc_reader/Audio \
+#  dds/m_axis_data_tdata \
+#  [get_concat_pin [list [get_slice_pin latched_mult_i_output/Q 23 8]  [get_slice_pin latched_mult_q_output/Q 23 8] ] concat_mult_iq] \
+#  [get_concat_pin [list data_for_cic_i/dout  data_for_cic_q/dout ] concat_cic_iq] \
+
+
+
 cell koheron:user:latched_mux:1.0 data_for_fifo {
             WIDTH 32
     	    N_INPUTS 4
@@ -703,6 +788,37 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
 
         }
 
+#Normal tvalid options:
+#            din [get_concat_pin [list \
+#  fir_i/m_axis_data_tvalid \
+#  fir_i/m_axis_data_tvalid \
+#  fir_i/m_axis_data_tvalid \
+#  cic_i/m_axis_data_tvalid \
+# ] tvalid_options ]
+#Test tvalid options:
+#  RightValid/Res \
+#  RightValid/Res \
+#  complex_mult/m_axis_dout_tvalid \
+#  delayed_tvalid/Q \
+
+cell koheron:user:latched_mux:1.0 tvalid_for_fifo {
+            WIDTH 1
+    	    N_INPUTS 4
+            SEL_WIDTH 2
+        } {
+            clk  $adc_clk 
+            sel [get_slice_pin ctl/control 3 2]
+            clken [get_constant_pin 1 1]
+            din [get_concat_pin [list \
+ fir_i/m_axis_data_tvalid \
+  fir_i/m_axis_data_tvalid \
+  fir_i/m_axis_data_tvalid \
+  cic_i/m_axis_data_tvalid \
+
+ ] tvalid_options ]
+
+        }
+
 
 
 
@@ -713,7 +829,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter {
   TDATA_NUM_BYTES 4
 } {
   s_axis_tdata data_for_fifo/dout
-  s_axis_tvalid fir_i/m_axis_data_tvalid
+  s_axis_tvalid tvalid_for_fifo/dout
   s_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
   m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
   s_axis_aclk $adc_clk

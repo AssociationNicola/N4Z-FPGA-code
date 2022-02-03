@@ -71,8 +71,9 @@ class Nicola4Z
         return sts.read<reg::average_amplitude>();
     }
 
-
-
+    uint32_t get_average_mult() {
+        return sts.read<reg::average_mult>();
+    }
 
     uint32_t get_ck_inner_io() {
         return sts.read<reg::ck_inner_io>();
@@ -112,6 +113,12 @@ class Nicola4Z
     void set_agc_value(uint32_t value) {
         ctl.write<reg::agc_value>(value);
     }
+
+
+    void set_mult_agc_value(uint32_t value) {
+        ctl.write<reg::mult_agc_value>(value);
+    }
+
 
     void set_user_io(uint32_t value) {
         ctl.write<reg::user_io>(value);
