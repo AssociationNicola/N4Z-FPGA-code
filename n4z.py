@@ -58,6 +58,10 @@ class Nicola4Z(object):
     def get_tx_fifo_vacancy(self):
         return self.client.recv_uint32()
 
+    @command()
+    def get_tx_fifo_occupancy(self):
+        return self.client.recv_uint32()
+
 
 #I and Q ave fifo read functions (values concatenated to be in sync):
     @command()
@@ -94,6 +98,13 @@ class Nicola4Z(object):
     @command()
     def xadc_read(self,channel):
         return self.client.recv_uint32()
+
+    def get_battery_level():
+        return self.xadc_read(1)
+
+    def get_tx_current():
+        return self.xadc_read(12)
+
 
     @command()
     def get_data(self):
@@ -179,11 +190,15 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
-#data fifo in options:  0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
-    def set_data_fifo_in_val(self, value):
-        value=(value&3) << 2
-        self.control_val=self.control_val & (2**32 -1 -2**3 -2**2)      
+#data fifo in options:  0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc, 4 raw ADC (ignore lowest 16 bits), 5  I+Q DDS, 6  I+Q after the multiplier (before cic), 7 I+Q after CIC agc
+#now includes an extra bit to add 4 further test option 4-7 (7 is a repeat of 3 but with a different trigger)
+    def set_data_fifo_in_val(self, fvalue):
+        value=(fvalue&3) << 2
+        ext=(fvalue&4) << 5    #selects options 4-7
+        self.control_val=self.control_val & (2**32 -1 -2**3 -2**2)      #resets bits 3 and 2
         self.control_val=self.control_val | value
+        self.control_val=self.control_val & (2**32 -1 -2**7)            #resets bit 7
+        self.control_val=self.control_val | ext
         self.set_control(self.control_val)
 
     def set_FIR_in_val(self, value):

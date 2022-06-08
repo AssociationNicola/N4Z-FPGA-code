@@ -264,8 +264,12 @@ cell xilinx.com:ip:cordic:6.0 cordic_mult_level_mon {
 
 }
 
-cell GN:user:averager:1.0 level_monitor_mult {
 
+#Now try longer time constant monitor
+cell GN:user:averager:1.1 level_monitor_mult {
+ABITS 16
+AMBITS 8
+SKIPBITS 8
 } {
 clk $adc_clk
 next cordic_mult_level_mon/m_axis_dout_tvalid
@@ -455,8 +459,11 @@ cell xilinx.com:ip:cordic:6.0 cordic_cic_level_mon {
 
 }
 
-cell GN:user:averager:1.0 level_monitor_cic {
-
+#use new level monitor to slow decay
+cell GN:user:averager:1.1 level_monitor_cic {
+ABITS 15
+AMBITS 8
+SKIPBITS 7
 } {
 clk $adc_clk
 next cordic_cic_level_mon/m_axis_dout_tvalid
@@ -500,19 +507,38 @@ cell koheron:user:latched_mux:1.0 data_for_fir_q {
 
 
 
-#2022 widths 32/32/32 > 16/16/24
+# Load fir set value if fir_set value changes
+ cell koheron:user:comparator:1.0 update_fir_coeffs {
+    DATA_WIDTH 8
+    OPERATION "NE"
+  } {
+    a [get_Q_pin [get_concat_pin [list [get_or_pin [get_slice_pin ctl/control 5 5] [get_slice_pin ctl/control 4 4] fir_set_logic] [get_constant_pin 0 7]] fir_set] 2 "noce" $adc_clk]
+    b [get_Q_pin fir_set/dout 3 "noce" $adc_clk]
+  }
 
+
+
+
+#2022 widths 32/32/32 > 16/16/24
+#2022 April changed FIR to have 2 sets of coefficients (RX and TX)
 set dec_rate_fir [get_parameter fir_decimation_rate]
 #Data input rate at 40kHz paced by the cic
-set fidi [open $project_path/128tap_i.txt r]
-gets $fidi charsi
-set fir_coeffs_i $charsi
+set fidi_rx [open $project_path/128tap_i_rx_deemph.txt r]
+set fidi_tx [open $project_path/128tap_i_tx_preemph.txt r]
+gets $fidi_rx charsi_rx
+gets $fidi_tx charsi_tx
+set fir_coeffs_i [concat $charsi_rx  " , " $charsi_tx ]
 puts stdout fir_coeffs_i
 
-set fidq [open $project_path/128tap_q.txt r]
-gets $fidq charsq
-set fir_coeffs_q $charsq
+set fidq_rx [open $project_path/128tap_q_rx_deemph.txt r]
+set fidq_tx [open $project_path/128tap_q_tx_preemph.txt r]
+gets $fidq_rx charsq_rx
+gets $fidq_tx charsq_tx
+set fir_coeffs_q [concat $charsq_rx  " , " $charsq_tx ]
+
 puts stdout fir_coeffs_q
+
+set n_fir_sets  [get_parameter n_fir_sets]
 #was: [exec python $project_path/fir.py $n_stages $dec_rate $diff_delay print]
 
 #removed:
@@ -532,12 +558,17 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_i {
   Output_Width 24
   Decimation_Rate $dec_rate_fir
   BestPrecision true
-
+  Coefficient_Sets $n_fir_sets
   CoefficientVector [subst {{$fir_coeffs_i}}]
 } {
   aclk $adc_clk
   s_axis_data_tvalid cic_i/m_axis_data_tvalid
   s_axis_data_tdata data_for_fir_i/dout
+
+  S_AXIS_CONFIG_TDATA [get_Q_pin fir_set/dout 1 "noce"  $adc_clk latch_fir_set]
+  S_AXIS_CONFIG_TVALID update_fir_coeffs/dout
+
+
 }
 
 cell xilinx.com:ip:fir_compiler:7.2 fir_q {
@@ -550,12 +581,15 @@ cell xilinx.com:ip:fir_compiler:7.2 fir_q {
   Output_Width 24
   Decimation_Rate $dec_rate_fir
   BestPrecision true
-
+  Coefficient_Sets $n_fir_sets
   CoefficientVector [subst {{$fir_coeffs_q}}]
 } {
   aclk $adc_clk
   s_axis_data_tvalid cic_q/m_axis_data_tvalid
   s_axis_data_tdata data_for_fir_q/dout
+  
+  S_AXIS_CONFIG_TDATA latch_fir_set/Q
+  S_AXIS_CONFIG_TVALID update_fir_coeffs/dout
 }
 
 
@@ -665,9 +699,11 @@ CLK $adc_clk
 
 }
 
-
-cell GN:user:averager:1.0 level_monitor {
-
+#Slow FIR time constant to ~0.5s
+cell GN:user:averager:1.1 level_monitor {
+ABITS 13
+AMBITS 8
+SKIPBITS 5
 } {
 clk $adc_clk
 next cordic_ssb/m_axis_dout_tvalid
@@ -773,17 +809,22 @@ set idx [add_master_interface $intercon_idx]
 
 cell koheron:user:latched_mux:1.0 data_for_fifo {
             WIDTH 32
-    	    N_INPUTS 4
-            SEL_WIDTH 2
+    	    N_INPUTS 8
+            SEL_WIDTH 3
         } {
             clk  $adc_clk 
-            sel [get_slice_pin ctl/control 3 2]
+            sel [get_concat_pin [list [get_slice_pin ctl/control 3 2] [get_slice_pin ctl/control 7 7] ] special_sel ] 
             clken [get_constant_pin 1 1]
             din [get_concat_pin [list \
   [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp] \
   [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] \
   concat_audio_iq/dout \
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
+  adc_reader/Audio \
+  dds/m_axis_data_tdata \
+  [get_concat_pin [list [get_slice_pin latched_mult_i_output/Q 23 8]  [get_slice_pin latched_mult_q_output/Q 23 8] ] concat_mult_iq] \
+  concat_cic_iq/dout \
+
  ] data_options ]
 
         }
@@ -803,18 +844,21 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
 
 cell koheron:user:latched_mux:1.0 tvalid_for_fifo {
             WIDTH 1
-    	    N_INPUTS 4
-            SEL_WIDTH 2
+    	    N_INPUTS 8
+            SEL_WIDTH 3
         } {
             clk  $adc_clk 
-            sel [get_slice_pin ctl/control 3 2]
+            sel special_sel/dout
             clken [get_constant_pin 1 1]
             din [get_concat_pin [list \
  fir_i/m_axis_data_tvalid \
   fir_i/m_axis_data_tvalid \
   fir_i/m_axis_data_tvalid \
   cic_i/m_axis_data_tvalid \
-
+  RightValid/Res \
+  RightValid/Res \
+  complex_mult/m_axis_dout_tvalid \
+  delayed_tvalid/Q \
  ] tvalid_options ]
 
         }

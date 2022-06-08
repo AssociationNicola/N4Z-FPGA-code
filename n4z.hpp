@@ -139,6 +139,10 @@ class Nicola4Z
         return tx_fifo_map.read<Fifo_regs::tdfv>();
     }
 
+    uint32_t get_tx_fifo_occupancy() {
+        return tx_fifo_map.read<Fifo_regs::rdfo>();
+    }
+
 
     void reset_fifo() {
         data_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);

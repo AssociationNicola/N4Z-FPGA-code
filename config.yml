@@ -11,13 +11,13 @@ cores:
   - fpga/cores/axis_constant_v1_0
   - fpga/cores/axis_lfsr_v1_0
   - fpga/cores/pdm_v1_0
-
+  - fpga/cores/comparator_v1_0
   - ./cores/OB_DAC_v1_0
   - ./cores/ad5541_v1_0
   - ./cores/edge_detector_v1_0
   - ./cores/i2s_rx_v1_0
   - ./cores/ssb_modulator_v1_0
-  - ./cores/averager_v1_0
+  - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
   - ./cores/IQ_averager_v1_0
 
@@ -99,7 +99,7 @@ parameters:
   fir_decimation_rate: 5
   cic_n_stages: 6
   pwm_width: 12
-
+  n_fir_sets: 2
 
 xdc:
   - ./ports.xdc
