@@ -677,62 +677,6 @@ cell xilinx.com:ip:cordic:6.0 cordic_ssb {
 
 }
 
-#Add compression memory: address from [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0]
-cell xilinx.com:ip:blk_mem_gen:8.4 ssb_amp_comp_lut {
-
-Memory_Type Single_Port_ROM 
-Enable_32bit_Address false 
-Use_Byte_Write_Enable false 
-Byte_Size 9 
-Write_Width_A 16 
-Write_Depth_A 1024 
-Read_Width_A 16 
-Write_Width_B 16 
-Read_Width_B 16 
-Register_PortA_Output_of_Memory_Primitives true 
-Load_Init_File true 
-Coe_File /home/graham/github/koheron-sdk/examples/cora7s/N4Z/SSB_TX_compression.coe 
-Fill_Remaining_Memory_Locations true 
-Use_RSTA_Pin false 
-Port_A_Write_Rate 0 
-use_bram_block Stand_Alone 
-EN_SAFETY_CKT false
-
-} {
-addra [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 6]
-clka $adc_clk
-ena [get_constant_pin 1 1]
-}
-
-
-#multiply amplitude by a degressive gain to compress 
-cell xilinx.com:ip:mult_gen:12.0 compressed_gain {
-
-PortAType.VALUE_SRC USER 
-PortAWidth.VALUE_SRC USER 
-PortBType.VALUE_SRC USER 
-PortBWidth.VALUE_SRC USER
-PortAType Unsigned 
-PortAWidth 16 
-PortBType Unsigned 
-PortBWidth 16 
-Multiplier_Construction Use_Mults 
-OptGoal Area 
-Use_Custom_Output_Width true 
-OutputWidthHigh 26 
-OutputWidthLow 11 
-PipeStages 3 
-ClockEnable true
-
-} {
-CLK  $adc_clk
-CE   cordic_ssb/m_axis_dout_tvalid
-A    ssb_amp_comp_lut/douta
-B    [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0]
-
-
-}
-#Output is compressed_gain/P
 
 cell xilinx.com:ip:c_addsub:12.0 diff_phase {
 B_Width.VALUE_SRC USER 
@@ -775,7 +719,7 @@ connect_pin [sts_pin max_amplitude] [get_concat_pin [list level_monitor/max_val 
 
 #Dec 21 insert mux to switch to fixed (2**25-2**20) QPSK amplitude when control bit 6 set to 1
 #SSB bit was "[get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]" but tried scaling a factor of 2 (dec 2021)
-#Replace [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] with compressed_gain/P
+
 cell koheron:user:latched_mux:1.0 amplitude_select {
             WIDTH 28
     	    N_INPUTS 2
@@ -784,7 +728,7 @@ cell koheron:user:latched_mux:1.0 amplitude_select {
             clk  clk_wiz_1/clk_out1
             sel [get_slice_pin ctl/control 6 6]
             clken [get_constant_pin 1 1]
-            din [get_Q_pin [get_concat_pin [list [get_concat_pin  [list [get_constant_pin 0 12] compressed_gain/P ] padded_amplitude] [get_constant_pin 32500000 28]] amplitude_options ] 1 noce clk_wiz_1/clk_out1 latched_amp_options]
+            din [get_Q_pin [get_concat_pin [list [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] padded_amplitude] [get_constant_pin 32500000 28]] amplitude_options ] 1 noce clk_wiz_1/clk_out1 latched_amp_options]
 
         }
 
