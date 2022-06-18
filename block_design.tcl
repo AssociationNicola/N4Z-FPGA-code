@@ -266,10 +266,11 @@ cell xilinx.com:ip:cordic:6.0 cordic_mult_level_mon {
 
 
 #Now try longer time constant monitor
+#Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
 cell GN:user:averager:1.1 level_monitor_mult {
-ABITS 16
+ABITS 12
 AMBITS 8
-SKIPBITS 8
+SKIPBITS 4
 } {
 clk $adc_clk
 next cordic_mult_level_mon/m_axis_dout_tvalid
@@ -460,10 +461,11 @@ cell xilinx.com:ip:cordic:6.0 cordic_cic_level_mon {
 }
 
 #use new level monitor to slow decay
+#Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
 cell GN:user:averager:1.1 level_monitor_cic {
-ABITS 15
+ABITS 9
 AMBITS 8
-SKIPBITS 7
+SKIPBITS 3
 } {
 clk $adc_clk
 next cordic_cic_level_mon/m_axis_dout_tvalid
@@ -754,10 +756,11 @@ CLK $adc_clk
 }
 
 #Slow FIR time constant to ~0.5s
+#Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
 cell GN:user:averager:1.1 level_monitor {
-ABITS 13
+ABITS 9
 AMBITS 8
-SKIPBITS 5
+SKIPBITS 1
 } {
 clk $adc_clk
 next cordic_ssb/m_axis_dout_tvalid
