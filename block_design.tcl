@@ -26,6 +26,7 @@ create_bd_port -dir O LCD_RS
 create_bd_port -dir O LCD_CS
 create_bd_port -dir O TP_CS
 create_bd_port -dir O TestOut
+create_bd_port -dir O TX_High
 create_bd_port -dir O audio_speaker
 create_bd_port -dir O Volume
 
@@ -173,6 +174,30 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
    M_AXIS dds/S_AXIS_CONFIG
  }
 
+
+#Add LO to detect MSF at 60kHz or 77.5kHz
+cell xilinx.com:ip:dds_compiler:6.0 dds_msf {
+   PartsPresent Phase_Generator_and_SIN_COS_LUT
+   DDS_Clock_Rate 0.2
+   Parameter_Entry Hardware_Parameters
+   Phase_Width 48
+   Output_Width 16
+   Phase_Increment Programmable
+   Latency_Configuration Configurable
+   Latency 9
+ } {
+   aclk $adc_clk
+ }
+  cell pavel-demin:user:axis_constant:1.0 phase_increment_msf {
+   AXIS_TDATA_WIDTH 48
+ } {
+   cfg_data [get_concat_pin [list [ctl_pin msf_phase_incr0] [get_slice_pin [ctl_pin msf_phase_incr1] 15 0]]]
+   aclk $adc_clk
+   M_AXIS dds_msf/S_AXIS_CONFIG
+ }
+
+
+
 #####################################
 # Complex multiply
 #####################################
@@ -206,6 +231,26 @@ cell xilinx.com:ip:dds_compiler:6.0 dds {
         s_axis_ctrl_tvalid lfsr/m_axis_tvalid
 
 }
+
+#Add mixer to detect msf (same as radio receiver but using the msf lo)
+  cell xilinx.com:ip:cmpy:6.0 complex_msf_mult {
+      APortWidth 16
+      BPortWidth 16
+      OutputWidth 24
+      OptimizeGoal Performance
+      RoundMode Random_Rounding
+  } {
+	aclk $adc_clk
+        s_axis_a_tdata concat_ADC0/dout
+        s_axis_a_tvalid  RightValid/Res
+
+        s_axis_b_tdata dds_msf/m_axis_data_tdata
+        s_axis_b_tvalid RightValid/Res
+        s_axis_ctrl_tdata lfsr/m_axis_tdata
+        s_axis_ctrl_tvalid lfsr/m_axis_tvalid
+
+}
+
 
 
 #Add an AGC to adjust the i and q output levels from the multiplier to go to the cici and cicq (24>16)
@@ -246,6 +291,200 @@ PipeStages 3
 
 }
 
+
+
+#Add an AGC to adjust the i and q output levels from the msf multiplier to go to the msf_cic_i and msf_cic_q (24>16)
+
+cell xilinx.com:ip:mult_gen:12.0 msf_agc_mult_i {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_Q_pin [get_slice_pin complex_msf_mult/m_axis_dout_tdata 23 0] 1 complex_msf_mult/m_axis_dout_tvalid $adc_clk latched_msf_mult_i_output]
+        B  [get_slice_pin ctl/msf_agc_value 15 0]
+
+
+}
+
+cell xilinx.com:ip:mult_gen:12.0 msf_agc_mult_q {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  [get_Q_pin [get_slice_pin complex_msf_mult/m_axis_dout_tdata 47 24] 1 complex_msf_mult/m_axis_dout_tvalid $adc_clk latched_msf_mult_q_output]
+        B  [get_slice_pin ctl/msf_agc_value 15 0]
+
+
+}
+
+
+cell xilinx.com:ip:cordic:6.0 cordic_msf_mult_level_mon {
+    Functional_Selection Translate
+    Pipelining_Mode Maximum
+    Phase_Format Scaled_Radians
+    Input_Width 16
+    Output_Width 16
+    Round_Mode Round_Pos_Neg_Inf
+} {
+    aclk  $adc_clk
+    s_axis_cartesian_tvalid [get_Q_pin complex_msf_mult/m_axis_dout_tvalid 3 noce $adc_clk msf_delayed_tvalid]
+    s_axis_cartesian_tdata [get_concat_pin [list msf_agc_mult_i/P msf_agc_mult_q/P] msf_mult_iq_vals]
+
+}
+
+
+cell GN:user:averager:1.1 msf_level_monitor_mult {
+ABITS 12
+AMBITS 8
+SKIPBITS 4
+} {
+clk $adc_clk
+next cordic_msf_mult_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_Q_pin [get_slice_pin cordic_msf_mult_level_mon/m_axis_dout_tdata 15 0] 1 cordic_msf_mult_level_mon/m_axis_dout_tvalid $adc_clk msf_mult_amplitude_latched ]
+}
+
+
+connect_pin [sts_pin msf_average_mult] [get_concat_pin [list msf_level_monitor_mult/average [get_constant_pin 0 16 ] ] msf_average_mult]
+
+
+
+# Define CIC parameters for msf filter (high decimation)
+
+set diff_delay_msf [get_parameter cic_msf_differential_delay]
+set dec_rate_msf [get_parameter cic_msf_decimation_rate]
+set n_stages_msf [get_parameter cic_msf_n_stages]
+
+cell xilinx.com:ip:cic_compiler:4.0 cic_msf_i {
+  Filter_Type Decimation
+  Number_Of_Stages $n_stages_msf
+  Fixed_Or_Initial_Rate $dec_rate_msf
+  Differential_Delay $diff_delay_msf
+  Input_Sample_Frequency [expr [get_parameter adc_clk] / 64000000.]
+  Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
+  Input_Data_Width 16
+  Quantization Truncation
+  Output_Data_Width 24
+  Use_Xtreme_DSP_Slice false
+} {
+  aclk $adc_clk
+  s_axis_data_tvalid [get_Q_pin complex_msf_mult/m_axis_dout_tvalid 4 noce $adc_clk msf_delayed_tvalid]
+  s_axis_data_tdata msf_agc_mult_i/P
+
+
+}
+
+cell xilinx.com:ip:cic_compiler:4.0 cic_msf_q {
+  Filter_Type Decimation
+  Number_Of_Stages $n_stages_msf
+  Fixed_Or_Initial_Rate $dec_rate_msf
+  Differential_Delay $diff_delay_msf
+  Input_Sample_Frequency [expr [get_parameter adc_clk] / 64000000.]
+  Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
+  Input_Data_Width 16
+  Quantization Truncation
+  Output_Data_Width 24
+  Use_Xtreme_DSP_Slice false
+} {
+  aclk $adc_clk
+  s_axis_data_tvalid msf_delayed_tvalid/Q
+  s_axis_data_tdata msf_agc_mult_q/P
+
+
+}
+
+#now agc for msf cic_msf
+cell xilinx.com:ip:mult_gen:12.0 agc_cic_msf_i {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15 
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  cic_msf_i/m_axis_data_tdata
+        B  [get_slice_pin ctl/msf_agc_value 31 16]
+
+
+}
+
+cell xilinx.com:ip:mult_gen:12.0 agc_cic_msf_q {
+PortBType Unsigned 
+PortAWidth 24 
+PortBWidth 16 
+Multiplier_Construction Use_Mults 
+Use_Custom_Output_Width true 
+OutputWidthHigh 30 
+OutputWidthLow 15
+PipeStages 3
+        } {
+
+        CLK $adc_clk
+        A  cic_msf_q/m_axis_data_tdata
+        B  [get_slice_pin ctl/msf_agc_value 31 16]
+
+
+}
+
+
+
+
+
+cell xilinx.com:ip:cordic:6.0 cordic_cic_msf_level_mon {
+    Functional_Selection Translate
+    Pipelining_Mode Maximum
+    Phase_Format Scaled_Radians
+    Input_Width 16
+    Output_Width 16
+    Round_Mode Round_Pos_Neg_Inf
+} {
+    aclk  $adc_clk
+    s_axis_cartesian_tvalid cic_msf_i/m_axis_data_tvalid
+    s_axis_cartesian_tdata [get_concat_pin [list agc_cic_msf_i/P agc_cic_msf_q/P] cic_msf_iq_vals]
+
+}
+
+#Monitor level of cic on the msf signal
+cell GN:user:averager:1.1 level_monitor_cic_msf {
+ABITS 5
+AMBITS 4
+SKIPBITS 1
+} {
+clk $adc_clk
+next cordic_cic_msf_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 15 0] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk cic_msf_amplitude_latched ]
+}
+
+
+
+
+connect_pin [sts_pin msf_average_amplitude]  [get_concat_pin [list level_monitor_cic_msf/average [get_constant_pin 0 16 ] ] msf_average_cic]
+
+
+connect_pin [sts_pin msf_signal] [get_concat_pin [list cic_msf_amplitude_latched/Q [get_constant_pin 0 16 ] ] padded_msf_signal]
+connect_pin [sts_pin msf_phase] [get_concat_pin [list [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 31 16] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk cic_msf_phase_latched ] [get_constant_pin 0 16 ] ] padded_msf_phase]
+
+
+#end msf with agc
 
 
 
@@ -795,12 +1034,16 @@ set idx [add_master_interface $intercon_idx]
 
 
 #Normal concat input:
-#            din [get_concat_pin [list \
 #  [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp] \
 #  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] \
 #  concat_audio_iq/dout \
 #  [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
-# ] data_options ]
+#  adc_reader/Audio \
+#  dds/m_axis_data_tdata \
+#  [get_concat_pin [list [get_slice_pin latched_mult_i_output/Q 23 8]  [get_slice_pin latched_mult_q_output/Q 23 8] ] concat_mult_iq] \
+#  concat_cic_iq/dout \
+#wanting to use    msf_mult_iq_vals/dout \  padded_msf_signal/dout \
+
 #Test inputs:
 #  adc_reader/Audio \
 #  dds/m_axis_data_tdata \
@@ -823,21 +1066,24 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
   concat_audio_iq/dout \
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
   adc_reader/Audio \
-  dds/m_axis_data_tdata \
-  [get_concat_pin [list [get_slice_pin latched_mult_i_output/Q 23 8]  [get_slice_pin latched_mult_q_output/Q 23 8] ] concat_mult_iq] \
-  concat_cic_iq/dout \
+  dds_msf/m_axis_data_tdata \
+  msf_mult_iq_vals/dout \
+  padded_msf_signal/dout \
 
  ] data_options ]
 
         }
 
 #Normal tvalid options:
-#            din [get_concat_pin [list \
-#  fir_i/m_axis_data_tvalid \
+#fir_i/m_axis_data_tvalid \
 #  fir_i/m_axis_data_tvalid \
 #  fir_i/m_axis_data_tvalid \
 #  cic_i/m_axis_data_tvalid \
-# ] tvalid_options ]
+#  RightValid/Res \
+#  RightValid/Res \
+#  complex_mult/m_axis_dout_tvalid \
+#  delayed_tvalid/Q \
+
 #Test tvalid options:
 #  RightValid/Res \
 #  RightValid/Res \
@@ -859,8 +1105,8 @@ cell koheron:user:latched_mux:1.0 tvalid_for_fifo {
   cic_i/m_axis_data_tvalid \
   RightValid/Res \
   RightValid/Res \
-  complex_mult/m_axis_dout_tvalid \
-  delayed_tvalid/Q \
+  msf_delayed_tvalid/Q \
+  cordic_cic_msf_level_mon/m_axis_dout_tvalid \
  ] tvalid_options ]
 
         }
@@ -954,12 +1200,12 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
 
 
 
-
+#was STOPAT 320
 
 
 cell GN:user:IQ_averager:1.0 q_averaged {
 NBITS 16
-STOPAT 320
+STOPAT 200
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
@@ -986,6 +1232,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
 #use bit 0 toggling to grab the I/Q values when receiveing
 connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 28]] padded_status]
 connect_port_pin TestOut [get_slice_pin q_averaged/bitclock 3 3]
+connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 
 set idx [add_master_interface $intercon_idx]
 #concat i and q data

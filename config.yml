@@ -66,6 +66,7 @@ control_registers:
   - user_io
   - control
   - phase_incr[2]
+  - msf_phase_incr[2]
   - ssb_tx_frequency
   - display_o
   - lcd
@@ -73,6 +74,9 @@ control_registers:
   - volume
   - agc_value
   - mult_agc_value
+  - msf_agc_value
+
+
 
 
 
@@ -83,6 +87,10 @@ status_registers:
   - forty_two
   - average_amplitude
   - average_mult
+  - msf_average_mult
+  - msf_average_amplitude
+  - msf_signal
+  - msf_phase
   - status
   - max_amplitude
   - ck_inner_io
@@ -90,6 +98,8 @@ status_registers:
 
 
 #The ADC runs at 200ksps, and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker. adc_clk however is 200kHz*64, ie 12.8MHz, but adc_clk below is still set to 200kHz as that is the rate at which the values are used from the dds!
+#Added dds for the MSF clock signal (60 or 77.5kHz) - use zero crossing as an accurate 60kHz clock for synchronisation and use as 1 minute accumulation timer
+#Use msf decimation of 4000 to have sample rate of 50Hz
 parameters:
   fclk0: 100000000 # FPGA clock speed in Hz
   adc_clk: 200000
@@ -98,6 +108,11 @@ parameters:
   cic_decimation_rate: 5
   fir_decimation_rate: 5
   cic_n_stages: 6
+
+  cic_msf_differential_delay: 2
+  cic_msf_decimation_rate: 4000
+  cic_msf_n_stages: 6
+
   pwm_width: 12
   n_fir_sets: 2
 
