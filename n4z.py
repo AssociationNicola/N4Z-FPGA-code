@@ -129,9 +129,24 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
+    def get_msf_average_amplitude(self):
+        return self.client.recv_uint32()
+
+    @command()
     def get_average_mult(self):
         return self.client.recv_uint32()
 
+    @command()
+    def get_msf_average_mult(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_msf_signal(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_msf_phase(self):
+        return self.client.recv_uint32()
 
     @command()
     def set_led(self, value):
@@ -162,6 +177,10 @@ class Nicola4Z(object):
         pass
 
     @command()
+    def set_msf_agc_value(self, value):
+        pass
+
+    @command()
     def set_user_io(self, value):
         pass
 
@@ -172,6 +191,7 @@ class Nicola4Z(object):
     @command()
     def set_ssb_tx_frequency(self, value):
         pass
+
 
 #Control bits: 0: (select USB),
 # 1: enable SSB output,
@@ -295,4 +315,8 @@ class Nicola4Z(object):
 # Set DDS frequency within FPGA (used for LO )
     @command(classname="Dds")
     def set_dds_freq(self, freq):
+        pass
+
+    @command(classname="Dds")
+    def set_msf_dds_freq(self, freq):
         pass

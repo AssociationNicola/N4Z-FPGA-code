@@ -71,9 +71,26 @@ class Nicola4Z
         return sts.read<reg::average_amplitude>();
     }
 
+    uint32_t get_msf_average_amplitude() {
+        return sts.read<reg::msf_average_amplitude>();
+    }
+
     uint32_t get_average_mult() {
         return sts.read<reg::average_mult>();
     }
+
+    uint32_t get_msf_average_mult() {
+        return sts.read<reg::msf_average_mult>();
+    }
+
+    uint32_t get_msf_signal() {
+        return sts.read<reg::msf_signal>();
+    }
+
+    uint32_t get_msf_phase() {
+        return sts.read<reg::msf_phase>();
+    }
+
 
     uint32_t get_ck_inner_io() {
         return sts.read<reg::ck_inner_io>();
@@ -84,7 +101,7 @@ class Nicola4Z
     }
 
 
-	 void set_ssb_tx_frequency(uint32_t value) {
+    void set_ssb_tx_frequency(uint32_t value) {
         ctl.write<reg::ssb_tx_frequency>(value);
     }
 	
@@ -117,6 +134,10 @@ class Nicola4Z
 
     void set_mult_agc_value(uint32_t value) {
         ctl.write<reg::mult_agc_value>(value);
+    }
+
+    void set_msf_agc_value(uint32_t value) {
+        ctl.write<reg::msf_agc_value>(value);
     }
 
 
