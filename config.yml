@@ -20,11 +20,22 @@ cores:
   - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
   - ./cores/IQ_averager_v1_0
+  - ./cores/data_flow_msf_v1_0
+  - ./cores/timing_control_msf_v1_0
 
 memory:
   - name: control
     offset: '0x60000000'
     range: 4K
+
+  - name: SecondAverage
+    offset: '0x60008000'
+    range: 1K
+
+  - name: MinuteAverage
+    offset: '0x60010000'
+    range: 1K
+
   - name: status
     offset: '0x50000000'
     range: 4K
@@ -67,6 +78,8 @@ control_registers:
   - control
   - phase_incr[2]
   - msf_phase_incr[2]
+  - msf_frequency
+  - msf_low_time
   - ssb_tx_frequency
   - display_o
   - lcd

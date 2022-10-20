@@ -485,7 +485,35 @@ connect_pin [sts_pin msf_phase] [get_concat_pin [list [get_Q_pin [get_slice_pin 
 
 
 #end msf with agc
+#add data flow and timing to write to MSF storage BRAMS
+#Data flow
+cell GN:user:data_flow_msf msf_BRAM_flow {
+} {
+  clk adc_dac/adc_clk
+  msf_level cic_msf_amplitude_latched/Q
+}
 
+#Timing control
+cell GN:user:timing_control_msf msf_BRAM_timing {
+} {
+
+}
+
+
+
+
+#Now add library to introduce block rams read for PS interface - or should we be using bram_recorder instead?:
+source $project_path/tcl/bram_sender.tcl
+# - and need to add interface at end (see LDS
+add_bram_sender  Sec_Ave_bram SecondAverage
+connect_cell Sec_Ave_bram {
+  clk adc_dac/adc_clk
+  rst rst_adc_clk/peripheral_reset
+  addr [get_slice_pin msf_BRAM_timing/carrier_counter 16 7]
+  wen msf_BRAM_timing/write_second_bram
+  data_in msf_BRAM_flow/level_to_store_second
+  data_out msf_BRAM_flow/stored_level_second
+}
 
 
 
@@ -959,17 +987,16 @@ connect_pin [sts_pin max_amplitude] [get_concat_pin [list level_monitor/max_val 
 #Dec 21 insert mux to switch to fixed (2**25-2**20) QPSK amplitude when control bit 6 set to 1
 #SSB bit was "[get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]" but tried scaling a factor of 2 (dec 2021)
 
-cell koheron:user:latched_mux:1.0 amplitude_select {
-            WIDTH 28
-    	    N_INPUTS 2
-            SEL_WIDTH 1
-        } {
-            clk  clk_wiz_1/clk_out1
-            sel [get_slice_pin ctl/control 6 6]
-            clken [get_constant_pin 1 1]
-            din [get_Q_pin [get_concat_pin [list [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] padded_amplitude] [get_constant_pin 32500000 28]] amplitude_options ] 1 noce clk_wiz_1/clk_out1 latched_amp_options]
-
-        }
+#cell koheron:user:latched_mux:1.0 amplitude_select {
+#            WIDTH 28
+#    	    N_INPUTS 2
+#            SEL_WIDTH 1
+#        } {
+#            clk  clk_wiz_1/clk_out1
+#            sel [get_slice_pin ctl/control 6 6]
+#            clken [get_constant_pin 1 1]
+#            din [get_Q_pin [get_concat_pin [list [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] padded_amplitude] #[get_constant_pin 32500000 28]] amplitude_options ] 1 noce clk_wiz_1/clk_out1 latched_amp_options]
+#
 
 
 
@@ -977,16 +1004,17 @@ cell koheron:user:latched_mux:1.0 amplitude_select {
 #Amplitude adjusted 31/1/21 to get the maximum dynamic range from the SSB modulation
 
 
-cell GN:user:ssb_modulator:1.0 ssb_tx {
+cell GN:user:ssbiq_modulator:1.0 ssb_tx {
 NBITS 24
 } {
  clk clk_wiz_1/clk_out1
  rst $rst_adc_clk_name/peripheral_reset
  delta_phase [get_slice_pin diff_phase/S 13 0] 
  ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 17 0] 
- amplitude [get_slice_pin amplitude_select/dout 26 0]
+ amplitude [get_Q_pin [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude] 1 noce clk_wiz_1/clk_out1 latched_amplitude]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
- iq [get_slice_pin ctl/qpsk 1 0]
+ set_qpsk [get_slice_pin ctl/control 6 6]
+ qpsk_phase [get_slice_pin ctl/qpsk 26 0]
 }
 
 #cell GN:user:photodiode_delay:1.0 pd_delays {
