@@ -47,7 +47,7 @@ module timing_control_tb();
    
 
 
-    #(50000*64*CLK_PERIOD)
+    #(250000*64*CLK_PERIOD)
     $finish;
   end
 

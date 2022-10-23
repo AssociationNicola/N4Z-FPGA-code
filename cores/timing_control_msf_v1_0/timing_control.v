@@ -45,7 +45,7 @@ parameter SECONDS_MINUTE = 59
     carrierpulsedelay2 <= carrierpulsedelay;
     carrierpulsedelay3 <= carrierpulsedelay2;    
     if (msf_carrier_pulse) begin
-       if (msf_carrier_counter < msf_frequency) begin
+       if (msf_carrier_counter < msf_frequency-1) begin
 
            msf_carrier_counter <= msf_carrier_counter+1;
        end
@@ -54,7 +54,7 @@ parameter SECONDS_MINUTE = 59
        end
     end
 	if (msf_carrier_counter == low_time) begin
-              one_sec_marker <= 1'b1
+              one_sec_marker <= 1'b1;
               if (still_low_time==3'b000) begin
                   still_low_time <= still_low_time+1;
 
@@ -78,7 +78,7 @@ parameter SECONDS_MINUTE = 59
         else begin
             still_low_time <= 3'b000;
             write_minute_bram <= 4'b0000 ;
-            one_sec_marker <= 1'b0
+            one_sec_marker <= 1'b0;
         end
 
 

@@ -489,7 +489,7 @@ connect_pin [sts_pin msf_phase] [get_concat_pin [list [get_Q_pin [get_slice_pin 
 #Data flow
 cell GN:user:data_flow_msf msf_BRAM_flow {
 } {
-  clk adc_dac/adc_clk
+  clk $adc_clk
   msf_level cic_msf_amplitude_latched/Q
 }
 
@@ -500,7 +500,7 @@ msf_carrier_pulse [get_and_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31] [
 
 msf_frequency [get_slice_pin ctl/msf_frequency 16 0]
 low_time [get_slice_pin ctl/msf_low_time 16 0]
-clk adc_dac/adc_clk
+clk $adc_clk
 }
 
 connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/msf_carrier_counter [get_constant_pin 0 15]]]
@@ -511,9 +511,9 @@ source $project_path/tcl/bram_sender.tcl
 # - and need to add interface at end (see LDS
 add_bram_sender  Sec_Ave_bram SecondAverage
 connect_cell Sec_Ave_bram {
-  clk adc_dac/adc_clk
-  rst rst_adc_clk/peripheral_reset
-  addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin msf_BRAM_timing/carrier_counter 16 7] ] padded_sec_ram_addr ]
+  clk $adc_clk
+  rst $rst_adc_clk_name/peripheral_reset
+  addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin msf_BRAM_timing/msf_carrier_counter 16 7] ] padded_sec_ram_addr ]
   wen msf_BRAM_timing/write_second_bram
   data_in msf_BRAM_flow/level_to_store_second
   data_out msf_BRAM_flow/stored_level_second
@@ -521,8 +521,8 @@ connect_cell Sec_Ave_bram {
 
 add_bram_sender  Min_Ave_bram MinuteAverage
 connect_cell Min_Ave_bram {
-  clk adc_dac/adc_clk
-  rst rst_adc_clk/peripheral_reset
+  clk $adc_clk
+  rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/second_counter [get_constant_pin 0 2]  ] padded_min_ram_addr]
   wen msf_BRAM_timing/write_minute_bram
   data_in msf_BRAM_flow/level_to_store_minute
@@ -1218,19 +1218,6 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
 #Take i from agc_cic_i/P and similarly q -This needs to be changed to v1_1 that counts msf carrier pulses!
 #ABITS is a bit of a compromise and assumes with average length set to 775 not all the summed amplitudes will be at top values
 
-  input clk,
-  input load_val,
-  input msf_carrier_pulse,
-  input one_sec_marker,
-  input [9:0] number_msf_periods,
-  input rst,
-  input signed [NBITS-1:0] amplitude,
-  output reg signed [NBITS-1:0] average,
-  output reg signed [NBITS+ABITS-1:0] accumulator,
-  output reg [9:0] counter,
-  output reg valid
-
-
 
 cell GN:user:IQ_averager:1.1 i_averaged {
 NBITS 16
@@ -1293,7 +1280,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
 #Output the bitclock (counts up to 16 x qpsk monitor periods, so rising edge of bit 2 could be used as 64ms period clock - or toggle of bit 3 for transmit)
 #send to a status register and a port pin
 #use bit 0 toggling to grab the I/Q values when receiveing
-connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 28]] padded_status]
+connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/msf_carrier_counter [get_constant_pin 0 15]] padded_status]
 connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 

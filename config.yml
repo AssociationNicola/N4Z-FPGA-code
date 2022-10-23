@@ -16,10 +16,10 @@ cores:
   - ./cores/ad5541_v1_0
   - ./cores/edge_detector_v1_0
   - ./cores/i2s_rx_v1_0
-  - ./cores/ssb_modulator_v1_0
+  - ./cores/ssbiq_modulator_v1_0
   - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
-  - ./cores/IQ_averager_v1_0
+  - ./cores/IQ_averager_v1_1
   - ./cores/data_flow_msf_v1_0
   - ./cores/timing_control_msf_v1_0
 
