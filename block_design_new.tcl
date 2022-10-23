@@ -496,14 +496,10 @@ cell GN:user:data_flow_msf msf_BRAM_flow {
 #Timing control
 cell GN:user:timing_control_msf msf_BRAM_timing {
 } {
-msf_carrier_pulse [get_and_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31] [get_not_pin  [get_Q_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31]  1 noce $adc_clk delayed_dds] ]  msf_carrier_pulse]
 
-msf_frequency [get_slice_pin ctl/msf_frequency 16 0]
-low_time [get_slice_pin ctl/msf_low_time 16 0]
-clk adc_dac/adc_clk
 }
 
-connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/msf_carrier_counter [get_constant_pin 0 15]]]
+
 
 
 #Now add library to introduce block rams read for PS interface - or should we be using bram_recorder instead?:
@@ -513,7 +509,7 @@ add_bram_sender  Sec_Ave_bram SecondAverage
 connect_cell Sec_Ave_bram {
   clk adc_dac/adc_clk
   rst rst_adc_clk/peripheral_reset
-  addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin msf_BRAM_timing/carrier_counter 16 7] ] padded_sec_ram_addr ]
+  addr [get_slice_pin msf_BRAM_timing/carrier_counter 16 7]
   wen msf_BRAM_timing/write_second_bram
   data_in msf_BRAM_flow/level_to_store_second
   data_out msf_BRAM_flow/stored_level_second
@@ -523,7 +519,7 @@ add_bram_sender  Min_Ave_bram MinuteAverage
 connect_cell Min_Ave_bram {
   clk adc_dac/adc_clk
   rst rst_adc_clk/peripheral_reset
-  addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/second_counter [get_constant_pin 0 2]  ] padded_min_ram_addr]
+  addr msf_BRAM_timing/second_counter
   wen msf_BRAM_timing/write_minute_bram
   data_in msf_BRAM_flow/level_to_store_minute
   data_out msf_BRAM_flow/stored_level_minute
@@ -1215,34 +1211,16 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
   axi_str_rxd_tdata   adc_clock_converter/m_axis_tdata
 }
 
-#Take i from agc_cic_i/P and similarly q -This needs to be changed to v1_1 that counts msf carrier pulses!
-#ABITS is a bit of a compromise and assumes with average length set to 775 not all the summed amplitudes will be at top values
-
-  input clk,
-  input load_val,
-  input msf_carrier_pulse,
-  input one_sec_marker,
-  input [9:0] number_msf_periods,
-  input rst,
-  input signed [NBITS-1:0] amplitude,
-  output reg signed [NBITS-1:0] average,
-  output reg signed [NBITS+ABITS-1:0] accumulator,
-  output reg [9:0] counter,
-  output reg valid
-
-
-
-cell GN:user:IQ_averager:1.1 i_averaged {
+#Take i from agc_cic_i/P and similarly q
+cell GN:user:IQ_averager:1.0 i_averaged {
 NBITS 16
-ABITS 9
+STOPAT 320
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
  amplitude agc_cic_i/P
  load_val cic_i/m_axis_data_tvalid
- msf_carrier_pulse msf_carrier_pulse/res
- one_sec_marker msf_BRAM_timing/one_sec_marker
- number_msf_periods ctl/IQ_average_length
+
 }
 
 
@@ -1263,17 +1241,14 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
 #was STOPAT 320
 
 
-cell GN:user:IQ_averager:1.1 q_averaged {
+cell GN:user:IQ_averager:1.0 q_averaged {
 NBITS 16
-ABITS 9
+STOPAT 200
 } {
  clk $adc_clk
  rst $rst_adc_clk_name/peripheral_reset
  amplitude agc_cic_q/P
  load_val cic_q/m_axis_data_tvalid
- msf_carrier_pulse msf_carrier_pulse/res
- one_sec_marker msf_BRAM_timing/one_sec_marker
- number_msf_periods ctl/IQ_average_length
 
 }
 
@@ -1294,7 +1269,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
 #send to a status register and a port pin
 #use bit 0 toggling to grab the I/Q values when receiveing
 connect_pin [sts_pin status] [get_concat_pin [list q_averaged/bitclock [get_constant_pin 0 28]] padded_status]
-connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
+connect_port_pin TestOut [get_slice_pin q_averaged/bitclock 3 3]
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 
 set idx [add_master_interface $intercon_idx]

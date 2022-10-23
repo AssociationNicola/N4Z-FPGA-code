@@ -30,7 +30,7 @@ memory:
 
   - name: SecondAverage
     offset: '0x60008000'
-    range: 4K
+    range: 1K
 
   - name: MinuteAverage
     offset: '0x60010000'
@@ -88,7 +88,6 @@ control_registers:
   - agc_value
   - mult_agc_value
   - msf_agc_value
-  - IQ_average_length
 
 
 

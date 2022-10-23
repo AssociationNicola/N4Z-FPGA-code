@@ -93,11 +93,6 @@ class Nicola4Z
         return sts.read<reg::msf_phase>();
     }
 
-    uint32_t get_msf_carrier_counter() {
-        return sts.read<reg::msf_carrier_counter>();
-    }
-
-
 
     uint32_t get_ck_inner_io() {
         return sts.read<reg::ck_inner_io>();
@@ -150,12 +145,6 @@ class Nicola4Z
     void set_msf_frequency(uint32_t value) {
         ctl.write<reg::msf_frequency>(value);
     }
-
-//This is the number of msf carrier pulses to average over before sending to fifo
-    void set_IQ_average_length(uint32_t value) {
-        ctl.write<reg::IQ_average_length>(value);
-    }
-
 
     void set_msf_low_time(uint32_t value) {
         ctl.write<reg::msf_low_time>(value);

@@ -15,7 +15,7 @@ module timing_control_tb();
    wire [5:0]		second_counter;
    wire [3:0]		write_second_bram;
    wire [3:0]		write_minute_bram;
-   wire [2:0] still_low_time;
+
 
 
 
@@ -31,8 +31,8 @@ module timing_control_tb();
     .one_sec_marker(one_sec_marker),
     .second_counter(second_counter),
     .write_second_bram(write_second_bram),
-    .write_minute_bram(write_minute_bram),
-    .still_low_time(still_low_time)
+    .write_minute_bram(write_minute_bram)
+
 
 
 

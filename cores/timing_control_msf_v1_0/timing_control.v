@@ -15,16 +15,15 @@ parameter SECONDS_MINUTE = 59
   
 
   output reg  [16:0]                 msf_carrier_counter,  //For Frankfurt, counts 0-77499 (address used for the second bram)
-  output wire  			      one_sec_marker,
+  output reg  			      one_sec_marker,
   output reg  [5:0]                 second_counter,	//count 0-59 (address used for the minute bram)
   output wire  [3:0]                 write_second_bram,	//
-  output reg  [3:0]                 write_minute_bram,
-  output reg [2:0] still_low_time
+  output reg  [3:0]                 write_minute_bram
 
 );
 
 
-//  reg  [2:0] still_low_time  = 2'b000;
+  reg  [2:0] still_low_time  = 3'b000;
   reg  carrierpulsedelay = 1'b0;
   reg  carrierpulsedelay2 = 1'b0;
   reg  carrierpulsedelay3 = 1'b0;
@@ -42,7 +41,7 @@ parameter SECONDS_MINUTE = 59
   end
 //should be ( msf_carrier_counter[6:0]==7'b0000000 ) - writes every 128th carrier pulse
  always @(posedge clk) begin
-    carrierpulsedelay <= msf_carrier_pulse & ( msf_carrier_counter[9:0]==10'b0000000000 );
+    carrierpulsedelay <= msf_carrier_pulse & ( msf_carrier_counter[6:0]==7'b0000000 );
     carrierpulsedelay2 <= carrierpulsedelay;
     carrierpulsedelay3 <= carrierpulsedelay2;    
     if (msf_carrier_pulse) begin
@@ -55,7 +54,7 @@ parameter SECONDS_MINUTE = 59
        end
     end
 	if (msf_carrier_counter == low_time) begin
-
+              one_sec_marker <= 1'b1
               if (still_low_time==3'b000) begin
                   still_low_time <= still_low_time+1;
 
@@ -79,13 +78,14 @@ parameter SECONDS_MINUTE = 59
         else begin
             still_low_time <= 3'b000;
             write_minute_bram <= 4'b0000 ;
+            one_sec_marker <= 1'b0
         end
 
 
 
     
 end
-//Only write second_bram ever 2^7 carrier pulses (eg at 620Hz for Frankfurt)
+//Only write second_bram ever 2^7 carrier pulses (eg at 605.47Hz for Frankfurt)
 assign  write_second_bram = {carrierpulsedelay3,carrierpulsedelay3,carrierpulsedelay3,carrierpulsedelay3} ;
 
 endmodule
