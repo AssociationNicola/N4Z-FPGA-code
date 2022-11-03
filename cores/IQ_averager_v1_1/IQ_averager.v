@@ -14,7 +14,7 @@ parameter ABITS = 8
   input load_val,
   input msf_carrier_pulse,
   input one_sec_marker,
-  input [9:0] number_msf_periods,
+  input [12:0] number_msf_periods,
   input rst,
   input signed [NBITS-1:0] amplitude,
   output reg signed [NBITS-1:0] average,
@@ -23,7 +23,7 @@ parameter ABITS = 8
 );   
 
 	reg signed [NBITS+ABITS-1:0] accumulator;
-	reg [9:0] counter;
+	reg [12:0] counter;
 
 
    

@@ -8,6 +8,13 @@ import numpy as np
 
 from koheron import command, connect
 
+
+# Recover data from BRAMS in 2 steps:
+#Read data to a class value and then load the value recovered, eg:
+#	driver.get_MinuteAverage()
+#	BRAMcontents=driver.MinuteAverage
+
+
 class Nicola4Z(object):
     def __init__(self, client):
         self.client = client
@@ -15,6 +22,28 @@ class Nicola4Z(object):
         self.n_pts = 1200
         self.fs = 2e5 # sampling frequency (Hz)
         self.control_val = 0
+        self.SecondAverage_size = self.get_SecondAverage_size()
+        self.SecondAverage = np.zeros((1, self.SecondAverage_size))
+        self.MinuteAverage_size = self.get_MinuteAverage_size()
+        self.MinuteAverage = np.zeros((1, self.MinuteAverage_size))
+
+    @command()
+    def get_SecondAverage_size(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_MinuteAverage_size(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_SecondAverage(self):
+        self.SecondAverage = self.client.recv_array(self.SecondAverage_size, dtype='int32')
+
+    @command()
+    def get_MinuteAverage(self):
+        self.MinuteAverage = self.client.recv_array(self.MinuteAverage_size, dtype='int32')
+
+
 
     @command()
     def get_fifo_occupancy(self):
@@ -37,6 +66,28 @@ class Nicola4Z(object):
         pass
 
     @command()
+    def reset_qpsk_tx_fifo(self):
+        pass
+
+    @command()
+    def get_tx_fifo_vacancy(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_tx_fifo_occupancy(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def write_qpsk_data(self,data):
+        pass
+
+    @command()
+    def get_qpsk_tx_fifo_vacancy(self):
+        return self.client.recv_uint32()
+
+
+
+    @command()
     def read_data(self):
         return self.client.recv_array(self.n_pts, dtype='int32', check_type=False)
 
@@ -53,14 +104,6 @@ class Nicola4Z(object):
     def get_dna(self):
         return self.client.recv_uint64()
 
-
-    @command()
-    def get_tx_fifo_vacancy(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_tx_fifo_occupancy(self):
-        return self.client.recv_uint32()
 
 
 #I and Q ave fifo read functions (values concatenated to be in sync):
@@ -149,6 +192,10 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
+    def get_msf_carrier_counter(self):
+        return self.client.recv_uint32()
+
+    @command()
     def set_led(self, value):
         pass
 
@@ -179,6 +226,27 @@ class Nicola4Z(object):
     @command()
     def set_msf_agc_value(self, value):
         pass
+
+#This sets the integer value of the msf frequency so will for example be exactly 77500 for Frankfurt
+    @command()
+    def set_msf_frequency(self, value):
+        pass
+
+    @command()
+    def set_msf_low_time(self, value):
+        pass
+
+#This sets the number of msf carrier periods to average the received I/Q signals over. Typically 2 lots of 3100 msf carrier periods for 25baud text and 11 for 3.5kbaud digital voice comms (2 bits per phase sample which is 4 lots of average values to align the set of 4 to a bit as the bit alignment is more critical and will need to be searched).
+#The IQ_average_length and qpsk_bit_length could be the same (3100 for text)
+    @command()
+    def set_IQ_average_length(self, value):
+        pass
+
+    @command()
+    def set_qpsk_bit_length(self, value):
+        pass
+
+
 
     @command()
     def set_user_io(self, value):
@@ -317,6 +385,7 @@ class Nicola4Z(object):
     def set_dds_freq(self, freq):
         pass
 
+#This needs to be adjusted carefully so will not be exactly 77500 for Frankfurt!
     @command(classname="Dds")
     def set_msf_dds_freq(self, freq):
         pass

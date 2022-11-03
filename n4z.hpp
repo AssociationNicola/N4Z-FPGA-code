@@ -40,6 +40,7 @@ class Nicola4Z
     , xadc(ctx.mm.get<mem::xadc>())
     , data_fifo_map(ctx.mm.get<mem::data_fifo>())
     , tx_fifo_map(ctx.mm.get<mem::tx_fifo>())
+    , qpsk_tx_fifo_map(ctx.mm.get<mem::qpsk_tx_fifo>())
     , ave_iq_fifo_map(ctx.mm.get<mem::ave_iq_fifo>())
     , SecondAverage_map(ctx.mm.get<mem::SecondAverage>())
     , MinuteAverage_map(ctx.mm.get<mem::MinuteAverage>())
@@ -156,6 +157,10 @@ class Nicola4Z
         ctl.write<reg::IQ_average_length>(value);
     }
 
+    void set_qpsk_bit_length(uint32_t value) {
+        ctl.write<reg::qpsk_bit_length>(value);
+    }
+
 
     void set_msf_low_time(uint32_t value) {
         ctl.write<reg::msf_low_time>(value);
@@ -177,6 +182,17 @@ class Nicola4Z
         return data_fifo_map.read<Fifo_regs::rdfo>();
     }
 
+
+    void reset_fifo() {
+        data_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);
+    }
+
+    uint32_t read_fifo() {
+        return data_fifo_map.read<Fifo_regs::rdfd>();
+    }
+
+
+
     uint32_t get_tx_fifo_vacancy() {
         return tx_fifo_map.read<Fifo_regs::tdfv>();
     }
@@ -186,16 +202,8 @@ class Nicola4Z
     }
 
 
-    void reset_fifo() {
-        data_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);
-    }
-
     void reset_tx_fifo() {
         tx_fifo_map.write<Fifo_regs::tdfr>(0x000000A5);
-    }
-
-    uint32_t read_fifo() {
-        return data_fifo_map.read<Fifo_regs::rdfd>();
     }
 
     void write_fifo(int32_t val) {
@@ -204,10 +212,32 @@ class Nicola4Z
 
 
 
+
+
+    uint32_t get_qpsk_tx_fifo_vacancy() {
+        return qpsk_tx_fifo_map.read<Fifo_regs::tdfv>();
+    }
+
+    uint32_t get_qpsk_tx_fifo_occupancy() {
+        return qpsk_tx_fifo_map.read<Fifo_regs::rdfo>();
+    }
+
+
+
+    void reset_qpsk_tx_fifo() {
+        qpsk_tx_fifo_map.write<Fifo_regs::tdfr>(0x000000A5);
+    }
+
+    void write_qpsk_fifo(int32_t val) {
+        qpsk_tx_fifo_map.write<Fifo_regs::tdfd>(val);
+    }
+
+
     uint32_t get_fifo_length() {
         return (data_fifo_map.read<Fifo_regs::rlr>() & 0x3FFFFF) >> 2;
     }
 
+ 
     void wait_for(uint32_t n_pts) {
         do {} while (get_fifo_length() < n_pts);
     }
@@ -233,6 +263,12 @@ class Nicola4Z
     void write_data(const std::array<int32_t, ARR_SIZE>& data) {
         for (unsigned int i=0; i < ARR_SIZE; i++) {
             write_fifo(data[i]);
+        }
+    }
+
+    void write_qpsk_data(const std::array<int32_t, ARR_SIZE>& data) {
+        for (unsigned int i=0; i < ARR_SIZE; i++) {
+            write_qpsk_fifo(data[i]);
         }
     }
 
@@ -335,6 +371,7 @@ class Nicola4Z
     Memory<mem::xadc>& xadc;
     Memory<mem::data_fifo>& data_fifo_map;
     Memory<mem::tx_fifo>& tx_fifo_map;
+    Memory<mem::qpsk_tx_fifo>& qpsk_tx_fifo_map;
     Memory<mem::ave_iq_fifo>& ave_iq_fifo_map;
     Memory<mem::SecondAverage>& SecondAverage_map;
     Memory<mem::MinuteAverage>& MinuteAverage_map;

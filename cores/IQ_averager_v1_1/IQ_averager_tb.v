@@ -14,13 +14,13 @@ module averager_tb;
     reg load_val;
     reg msf_carrier_pulse;
     reg one_sec_marker;
-    reg [9:0] number_msf_periods;
+    reg [12:0] number_msf_periods;
 
 	// Outputs
 	wire [15:0] average;
 	wire valid;
 	wire signed [23:0] accumulator;
-	wire [9:0] counter;
+	wire [12:0] counter;
 
 	
 	// Testvars for runlength-testing
