@@ -172,7 +172,7 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
-    def get_msf_average_amplitude(self):
+    def get_msf_diff_phase(self):
         return self.client.recv_uint32()
 
     @command()
@@ -183,12 +183,14 @@ class Nicola4Z(object):
     def get_msf_average_mult(self):
         return self.client.recv_uint32()
 
+
+
     @command()
-    def get_msf_signal(self):
+    def get_msf_i(self):
         return self.client.recv_uint32()
 
     @command()
-    def get_msf_phase(self):
+    def get_msf_q(self):
         return self.client.recv_uint32()
 
     @command()

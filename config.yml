@@ -108,9 +108,9 @@ status_registers:
   - average_amplitude
   - average_mult
   - msf_average_mult
-  - msf_average_amplitude
-  - msf_signal
-  - msf_phase
+  - msf_diff_phase
+  - msf_i
+  - msf_q
   - msf_carrier_counter
   - status
   - max_amplitude

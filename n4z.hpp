@@ -74,7 +74,7 @@ class Nicola4Z
         return sts.read<reg::average_amplitude>();
     }
 
-    uint32_t get_msf_average_amplitude() {
+    uint32_t get_msf_diff_phase() {
         return sts.read<reg::msf_average_amplitude>();
     }
 
@@ -86,12 +86,12 @@ class Nicola4Z
         return sts.read<reg::msf_average_mult>();
     }
 
-    uint32_t get_msf_signal() {
-        return sts.read<reg::msf_signal>();
+    uint32_t get_msf_i() {
+        return sts.read<reg::msf_i>();
     }
 
-    uint32_t get_msf_phase() {
-        return sts.read<reg::msf_phase>();
+    uint32_t get_msf_q() {
+        return sts.read<reg::msf_q>();
     }
 
     uint32_t get_msf_carrier_counter() {
