@@ -108,6 +108,7 @@ status_registers:
   - average_amplitude
   - average_mult
   - msf_average_mult
+  - msf_average_amplitude
   - msf_diff_phase
   - msf_i
   - msf_q

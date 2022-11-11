@@ -445,9 +445,7 @@ PipeStages 3
 }
 
 
-TO DO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-Instead of monitoring cordic level (but keep cordic) replace with averaged i and q to export to status registers
-msf_i and msf_q
+
 
 cell xilinx.com:ip:cordic:6.0 cordic_cic_msf_level_mon {
     Functional_Selection Translate
@@ -486,11 +484,27 @@ rst $rst_adc_clk_name/peripheral_reset
 amplitude [get_Q_pin agc_cic_msf_q/P 1 cic_msf_q/m_axis_data_tvalid $adc_clk cic_msf_q_latched ]
 }
 
+cell GN:user:averager:1.1 level_monitor_cic_msf {
+ABITS 5
+AMBITS 4
+SKIPBITS 1
+} {
+clk $adc_clk
+next cordic_cic_msf_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 15 0] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk cic_msf_amplitude_latched ]
+}
 
 
 
-connect_pin [sts_pin msf_i] 
-connect_pin [sts_pin msf_q] 
+
+connect_pin [sts_pin msf_average_amplitude]  [get_concat_pin [list level_monitor_cic_msf/average [get_constant_pin 0 16 ] ] msf_average_cic]
+
+
+
+
+connect_pin [sts_pin msf_i] [get_concat_pin [list level_monitor_cic_msf_i/average [get_constant_pin 0 16 ] ] msf_average_i]
+connect_pin [sts_pin msf_q] [get_concat_pin [list level_monitor_cic_msf_q/average [get_constant_pin 0 16 ] ] msf_average_q]
 
 #This is to look at the phase change of the msf signal after the cic (~200Hz rate with 1000 decimation)
 cell xilinx.com:ip:c_addsub:12.0 msf_diff_phase {
@@ -508,37 +522,37 @@ Latency 1
 B_Value 0000000000000000
 
 } {
-A [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 31 16] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_cordic_phase_latched_8k ]
-B [get_Q_pin msf_cordic_phase_latched_8k/Q 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk]
+A [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 31 16] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_cordic_phase_latched ]
+B [get_Q_pin msf_cordic_phase_latched/Q 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk]
 CLK $adc_clk
 
 }
 
 cell GN:user:averager:1.1 level_monitor_msf_diff_phase {
-ABITS 7
+ABITS 5
 AMBITS 4
 SKIPBITS 1
 } {
 clk $adc_clk
 next cordic_cic_msf_level_mon/m_axis_dout_tvalid
 rst $rst_adc_clk_name/peripheral_reset
-amplitude [[get_slice_pin msf_diff_phase/S 15 0]  1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_diff_phase_latched ]
+amplitude [get_concat_pin [list [get_constant_pin 0 2] [get_Q_pin [get_slice_pin msf_diff_phase/S 13 0]  1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_diff_phase_latched_short ] ] msf_diff_phase_latched]
 }
 
 
 
-connect_pin [sts_pin msf_diff_phase]  [get_concat_pin [list level_monitor_msf_diff_phase/average [get_constant_pin 0 16 ] ] msf_average_cic]
+connect_pin [sts_pin msf_diff_phase]  [get_concat_pin [list level_monitor_msf_diff_phase/average [get_constant_pin 0 16 ] ] msf_padded_diff_phase]
 
 #end msf with agc
 #add data flow and timing to write to MSF storage BRAMS
-#Data flow
+#Data flow - doesn't look good with SHIFTBITS=7, try =5
 cell GN:user:data_flow_msf msf_BRAM_flow {
 
-SHIFTBITS 16
+SHIFTBITS 7
 
 } {
   clk $adc_clk
-  msf_level [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 31 16] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk cic_msf_phase_latched ]
+  msf_level cic_msf_amplitude_latched/Q
 }
 
 #Timing control
@@ -1207,8 +1221,8 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
   adc_reader/Audio \
   dds_msf/m_axis_data_tdata \
-  msf_mult_iq_vals/dout \
-  padded_msf_signal/dout \
+  [get_concat_pin [list cic_msf_i_latched/Q cic_msf_q_latched/Q] concat_msf_IQ] \
+  msf_diff_phase/S \
 
  ] data_options ]
 
@@ -1245,7 +1259,7 @@ cell koheron:user:latched_mux:1.0 tvalid_for_fifo {
   cic_i/m_axis_data_tvalid \
   RightValid/Res \
   RightValid/Res \
-  msf_delayed_tvalid/Q \
+  cic_msf_i/m_axis_data_tvalid  \
   cordic_cic_msf_level_mon/m_axis_dout_tvalid \
  ] tvalid_options ]
 

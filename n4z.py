@@ -183,6 +183,9 @@ class Nicola4Z(object):
     def get_msf_average_mult(self):
         return self.client.recv_uint32()
 
+    @command()
+    def get_msf_average_amplitude(self):
+        return self.client.recv_uint32()
 
 
     @command()

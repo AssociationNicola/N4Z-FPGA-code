@@ -13,12 +13,12 @@ parameter SKIPBITS = 5
   input clk,
   input next,
   input rst,
-  input [NBITS-1:0] amplitude,
-  output  [NBITS-1:0] average,
+  input signed [NBITS-1:0] amplitude,
+  output  signed [NBITS-1:0] average,
   output reg [NBITS-1:0] max_val
 );   
 
-	reg [NBITS+ABITS-1:0] accumulator;
+	reg signed [NBITS+ABITS-1:0] accumulator;
         reg [SKIPBITS-1:0] skipcounter;
    
 	assign average = accumulator[NBITS+ABITS-1:ABITS];
@@ -33,7 +33,7 @@ parameter SKIPBITS = 5
 
         if (next==1) begin
            skipcounter <= skipcounter +1'b1;
-           accumulator <= accumulator + amplitude - (accumulator>>ABITS);
+           accumulator <= accumulator + amplitude - (accumulator>>>ABITS);
         
             if (amplitude > max_val)
                 max_val <= amplitude;
