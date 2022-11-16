@@ -11,8 +11,8 @@ from koheron import command, connect
 
 # Recover data from BRAMS in 2 steps:
 #Read data to a class value and then load the value recovered, eg:
-#	driver.get_MinuteAverage()
-#	BRAMcontents=driver.MinuteAverage
+#	driver.get_SecondBRAM()
+#	BRAMcontents=driver.SecondBRAM
 
 
 class Nicola4Z(object):
@@ -22,28 +22,16 @@ class Nicola4Z(object):
         self.n_pts = 1200
         self.fs = 2e5 # sampling frequency (Hz)
         self.control_val = 0
-        self.SecondAverage_size = self.get_SecondAverage_size()
-        self.SecondAverage = np.zeros((1, self.SecondAverage_size))
-        self.MinuteAverage_size = self.get_MinuteAverage_size()
-        self.MinuteAverage = np.zeros((1, self.MinuteAverage_size))
+        self.SecondBRAM_size = self.get_SecondBRAM_size()
+        self.SecondBRAM = np.zeros((1, self.SecondBRAM_size))
 
     @command()
-    def get_SecondAverage_size(self):
+    def get_SecondBRAM_size(self):
         return self.client.recv_uint32()
 
     @command()
-    def get_MinuteAverage_size(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_SecondAverage(self):
-        self.SecondAverage = self.client.recv_array(self.SecondAverage_size, dtype='int32')
-
-    @command()
-    def get_MinuteAverage(self):
-        self.MinuteAverage = self.client.recv_array(self.MinuteAverage_size, dtype='int32')
-
-
+    def get_SecondBRAM(self):
+        self.SecondBRAM = self.client.recv_array(self.SecondBRAM_size, dtype='int32')
 
     @command()
     def get_fifo_occupancy(self):
@@ -126,6 +114,10 @@ class Nicola4Z(object):
     @command()
     def read_24_IQave(self):
         return self.client.recv_array(24, dtype='int32', check_type=False)
+
+    @command()
+    def read_250_IQave(self):
+        return self.client.recv_array(250, dtype='int32', check_type=False)
 
     @command()
     def read_available_IQave(self):
@@ -284,7 +276,7 @@ class Nicola4Z(object):
         self.set_control(self.control_val)
 
 #data fifo in options:  0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc, 4 raw ADC (ignore lowest 16 bits), 5  I+Q DDS, 6  I+Q after the multiplier (before cic), 7 I+Q after CIC agc
-#now includes an extra bit to add 4 further test option 4-7 (7 is a repeat of 3 but with a different trigger)
+#now includes an extra bit to add 4 further test option 4-7 (7 is a repeat of 3 but with a different trigger) - uses bits: 2,3,7 of control register
     def set_data_fifo_in_val(self, fvalue):
         value=(fvalue&3) << 2
         ext=(fvalue&4) << 5    #selects options 4-7

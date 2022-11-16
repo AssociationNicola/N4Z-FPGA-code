@@ -20,7 +20,6 @@ cores:
   - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
   - ./cores/IQ_averager_v1_1
-  - ./cores/data_flow_msf_v1_0
   - ./cores/timing_control_msf_v1_0
   - ./cores/QPSK_tx_timing_v1_0
 
@@ -29,13 +28,9 @@ memory:
     offset: '0x60000000'
     range: 4K
 
-  - name: SecondAverage
+  - name: SecondBRAM
     offset: '0x60008000'
-    range: 4K
-
-  - name: MinuteAverage
-    offset: '0x60010000'
-    range: 1K
+    range: 16K
 
   - name: status
     offset: '0x50000000'
@@ -121,7 +116,7 @@ status_registers:
 
 #The ADC runs at 200ksps, and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker. adc_clk however is 200kHz*64, ie 12.8MHz, but adc_clk below is still set to 200kHz as that is the rate at which the values are used from the dds!
 #Added dds for the MSF clock signal (60 or 77.5kHz) - use zero crossing as an accurate 60kHz clock for synchronisation and use as 1 minute accumulation timer
-#Use msf decimation of 1000 to have sample rate of 200Hz for the msf_signal andmsf_phase values (msf_average_amplitude is ~256 times slower)
+#Use msf decimation of 800 to have sample rate of 250Hz for the msf_signal andmsf_phase values (msf_average_amplitude is ~256 times slower)
 #Problem Oct 2022 - shouldn't adc_clk be 12.8MHz and not 200000Hz?
 parameters:
   fclk0: 100000000 # FPGA clock speed in Hz
@@ -133,7 +128,7 @@ parameters:
   cic_n_stages: 6
 
   cic_msf_differential_delay: 2
-  cic_msf_decimation_rate: 1000
+  cic_msf_decimation_rate: 800
   cic_msf_n_stages: 6
 
   pwm_width: 12

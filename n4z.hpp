@@ -25,8 +25,7 @@ namespace Fifo_regs {
 }
 
 constexpr uint32_t ARR_SIZE = 1200;
-constexpr uint32_t SecondAverage_size = mem::SecondAverage_range/sizeof(uint32_t);
-constexpr uint32_t MinuteAverage_size = mem::MinuteAverage_range/sizeof(uint32_t);
+constexpr uint32_t SecondBRAM_size = mem::SecondBRAM_range/sizeof(uint32_t);
 
 
 
@@ -42,8 +41,8 @@ class Nicola4Z
     , tx_fifo_map(ctx.mm.get<mem::tx_fifo>())
     , qpsk_tx_fifo_map(ctx.mm.get<mem::qpsk_tx_fifo>())
     , ave_iq_fifo_map(ctx.mm.get<mem::ave_iq_fifo>())
-    , SecondAverage_map(ctx.mm.get<mem::SecondAverage>())
-    , MinuteAverage_map(ctx.mm.get<mem::MinuteAverage>())
+    , SecondBRAM_map(ctx.mm.get<mem::SecondBRAM>())
+
 
     {
     }
@@ -154,7 +153,7 @@ class Nicola4Z
     }
 
     void set_msf_frequency(uint32_t value) {
-        ctl.write<reg::msf_frequency>(value);
+        ctl.write<reg::msf_frequency>(value/250);
     }
 
 //This is the number of msf carrier pulses to average over before sending to fifo
@@ -324,9 +323,17 @@ class Nicola4Z
         return data;
     }
 
-    auto& read_24_Iave() {
+    auto& read_24_IQave() {
         wait_for_IQave_n_pts(24);
         for (unsigned int i=0; i < 24; i++) {
+            data[i] = read_IQave_fifo();
+        }
+        return data;
+    }
+
+    auto& read_250_IQave() {
+        wait_for_IQave_n_pts(250);
+        for (unsigned int i=0; i < 250; i++) {
             data[i] = read_IQave_fifo();
         }
         return data;
@@ -350,21 +357,15 @@ class Nicola4Z
 
 //end <IQave>
 //BRAM additions
-    std::array<int32_t, SecondAverage_size> get_SecondAverage() {
-        return SecondAverage_map.read_array<int32_t, SecondAverage_size>();
+    std::array<int32_t, SecondBRAM_size> get_SecondBRAM() {
+        return SecondBRAM_map.read_array<int32_t, SecondBRAM_size>();
     }
 
-    std::array<int32_t, MinuteAverage_size> get_MinuteAverage() {
-        return MinuteAverage_map.read_array<int32_t, MinuteAverage_size>();
+
+    uint32_t get_SecondBRAM_size() {
+        return SecondBRAM_size;
     }
 
-    uint32_t get_SecondAverage_size() {
-        return SecondAverage_size;
-    }
-
-    uint32_t get_MinuteAverage_size() {
-        return MinuteAverage_size;
-    }
 
 
 //end BRAM additions
@@ -378,8 +379,7 @@ class Nicola4Z
     Memory<mem::tx_fifo>& tx_fifo_map;
     Memory<mem::qpsk_tx_fifo>& qpsk_tx_fifo_map;
     Memory<mem::ave_iq_fifo>& ave_iq_fifo_map;
-    Memory<mem::SecondAverage>& SecondAverage_map;
-    Memory<mem::MinuteAverage>& MinuteAverage_map;
+    Memory<mem::SecondBRAM>& SecondBRAM_map;
 
     std::array<uint32_t, ARR_SIZE> data;
 

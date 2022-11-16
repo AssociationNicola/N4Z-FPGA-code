@@ -506,7 +506,7 @@ connect_pin [sts_pin msf_average_amplitude]  [get_concat_pin [list level_monitor
 connect_pin [sts_pin msf_i] [get_concat_pin [list level_monitor_cic_msf_i/average [get_constant_pin 0 16 ] ] msf_average_i]
 connect_pin [sts_pin msf_q] [get_concat_pin [list level_monitor_cic_msf_q/average [get_constant_pin 0 16 ] ] msf_average_q]
 
-#This is to look at the phase change of the msf signal after the cic (~200Hz rate with 1000 decimation)
+#This is to look at the phase change of the msf signal after the cic (~250Hz rate with 800 decimation)
 cell xilinx.com:ip:c_addsub:12.0 msf_diff_phase {
 B_Width.VALUE_SRC USER 
 A_Width.VALUE_SRC USER 
@@ -544,53 +544,32 @@ amplitude [get_concat_pin [list [get_constant_pin 0 2] [get_Q_pin [get_slice_pin
 connect_pin [sts_pin msf_diff_phase]  [get_concat_pin [list level_monitor_msf_diff_phase/average [get_constant_pin 0 16 ] ] msf_padded_diff_phase]
 
 #end msf with agc
-#add data flow and timing to write to MSF storage BRAMS
-#Data flow - doesn't look good with SHIFTBITS=7, try =5
-cell GN:user:data_flow_msf msf_BRAM_flow {
-
-SHIFTBITS 7
-
-} {
-  clk $adc_clk
-  msf_level cic_msf_amplitude_latched/Q
-}
 
 #Timing control
 cell GN:user:timing_control_msf msf_BRAM_timing {
 } {
 msf_carrier_pulse [get_and_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31] [get_not_pin  [get_Q_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31]  1 noce $adc_clk delayed_dds] ]  msf_carrier_pulse]
 
-msf_frequency [get_slice_pin ctl/msf_frequency 16 0]
-low_time [get_slice_pin ctl/msf_low_time 16 0]
+msf_frequency [get_slice_pin ctl/msf_frequency 8 0]
+low_time [get_slice_pin ctl/msf_low_time 7 0]
+rst [get_slice_pin ctl/control 15 15]
 clk $adc_clk
 }
 
-connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/msf_carrier_counter [get_constant_pin 0 15]]]
+connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 15]]]
 
 
 #Now add library to introduce block rams read for PS interface - or should we be using bram_recorder instead?:
 source $project_path/tcl/bram_sender.tcl
 # - and need to add interface at end (see LDS
-add_bram_sender  Sec_Ave_bram SecondAverage
-connect_cell Sec_Ave_bram {
+add_bram_sender  Sec_bram SecondBRAM
+connect_cell Sec_bram {
   clk $adc_clk
   rst $rst_adc_clk_name/peripheral_reset
-  addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin msf_BRAM_timing/msf_carrier_counter 16 7] ] padded_sec_ram_addr ]
+  addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/address_counter ] padded_ram_addr ]
   wen msf_BRAM_timing/write_second_bram
-  data_in msf_BRAM_flow/level_to_store_second
-  data_out msf_BRAM_flow/stored_level_second
+  data_in [get_concat_pin [list cic_msf_i_latched/Q cic_msf_q_latched/Q  ] concat_msf_iq]
 }
-
-add_bram_sender  Min_Ave_bram MinuteAverage
-connect_cell Min_Ave_bram {
-  clk $adc_clk
-  rst $rst_adc_clk_name/peripheral_reset
-  addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/second_counter [get_constant_pin 0 2]  ] padded_min_ram_addr]
-  wen msf_BRAM_timing/write_minute_bram
-  data_in msf_BRAM_flow/level_to_store_minute
-  data_out msf_BRAM_flow/stored_level_minute
-}
-
 
 
 cell xilinx.com:ip:cordic:6.0 cordic_mult_level_mon {
@@ -1221,7 +1200,7 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
   adc_reader/Audio \
   dds_msf/m_axis_data_tdata \
-  [get_concat_pin [list cic_msf_i_latched/Q cic_msf_q_latched/Q] concat_msf_IQ] \
+  concat_msf_IQ/dout \
   msf_diff_phase/S \
 
  ] data_options ]
@@ -1389,7 +1368,7 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
 #Output the bitclock (counts up to 16 x qpsk monitor periods, so rising edge of bit 2 could be used as 64ms period clock - or toggle of bit 3 for transmit)
 #send to a status register and a port pin
 #use bit 0 toggling to grab the I/Q values when receiveing
-connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/msf_carrier_counter [get_constant_pin 0 15]] padded_status]
+connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status]
 connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 
