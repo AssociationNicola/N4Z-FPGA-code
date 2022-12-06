@@ -66,7 +66,7 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     @command()
-    def write_qpsk_data(self,data):
+    def write_250_qpsk_data(self,data):
         pass
 
     @command()
@@ -112,8 +112,8 @@ class Nicola4Z(object):
         return self.client.recv_array(512, dtype='int32', check_type=False)
 
     @command()
-    def read_24_IQave(self):
-        return self.client.recv_array(24, dtype='int32', check_type=False)
+    def read_25_IQave(self):
+        return self.client.recv_array(25, dtype='int32', check_type=False)
 
     @command()
     def read_250_IQave(self):
@@ -197,10 +197,6 @@ class Nicola4Z(object):
         pass
 
     @command()
-    def set_qpsk(self, value):
-        pass
-
-    @command()
     def set_lcd(self, value):
         pass
 
@@ -234,7 +230,7 @@ class Nicola4Z(object):
         pass
 
 #This sets the number of msf carrier periods to average the received I/Q signals over. Typically 2 lots of 3100 msf carrier periods for 25baud text and 11 for 3.5kbaud digital voice comms (2 bits per phase sample which is 4 lots of average values to align the set of 4 to a bit as the bit alignment is more critical and will need to be searched).
-#The IQ_average_length and qpsk_bit_length could be the same (3100 for text)
+#The IQ_average_length and qpsk_bit_length could be the same (3100 - Frankfurt or 2400/Rugby for text)
     @command()
     def set_IQ_average_length(self, value):
         pass

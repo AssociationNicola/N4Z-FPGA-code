@@ -131,10 +131,6 @@ class Nicola4Z
         ctl.write<reg::average>(value);
     }
 
-    void set_qpsk(uint32_t value) {
-        ctl.write<reg::qpsk>(value);
-    }
-
     void set_volume(uint32_t value) {
         ctl.write<reg::volume>(value);
     }
@@ -270,8 +266,8 @@ class Nicola4Z
         }
     }
 
-    void write_qpsk_data(const std::array<int32_t, ARR_SIZE>& data) {
-        for (unsigned int i=0; i < ARR_SIZE; i++) {
+    void write_250_qpsk_data(const std::array<int32_t, 250>& data) {
+        for (unsigned int i=0; i < 250; i++) {
             write_qpsk_fifo(data[i]);
         }
     }
@@ -323,9 +319,9 @@ class Nicola4Z
         return data;
     }
 
-    auto& read_24_IQave() {
-        wait_for_IQave_n_pts(24);
-        for (unsigned int i=0; i < 24; i++) {
+    auto& read_25_IQave() {
+        wait_for_IQave_n_pts(25);
+        for (unsigned int i=0; i < 25; i++) {
             data[i] = read_IQave_fifo();
         }
         return data;

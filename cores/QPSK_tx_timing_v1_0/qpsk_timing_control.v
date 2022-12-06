@@ -8,7 +8,7 @@ module timing_control #
 
 (
   input  wire                         msf_carrier_pulse,
-  input  wire [12:0]                  msf_cp_per_bit,		//For text this would be 3100 and fifo would repeat pairs of values to send qpsk phases at 12.5Hz
+  input  wire [12:0]                  msf_cp_per_bit,		//For text this would be 3100 for Frankfurt and 2400 for Rugby and fifo would repeat pairs of values to send qpsk phases at 12.5Hz
   input  wire                         one_sec_pulse,          //From one_sec_marker
   input  wire    		      clk,		//normally $adc_clk
   input wire                          qpsk_start,       //from control_val[6] to say fifo has been loaded and ready to go.
@@ -60,6 +60,7 @@ module timing_control #
   end
   else begin
     qpsk_go <= 1'b0;
+    next_output <= 1'b0;
   end
     
 end

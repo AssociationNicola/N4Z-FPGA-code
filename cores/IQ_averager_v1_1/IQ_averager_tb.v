@@ -10,17 +10,19 @@ module averager_tb;
 	// Inputs
 	reg clk;
 	reg rst;
-	reg [15:0] amplitude;
+	reg signed [15:0] amplitude;
     reg load_val;
     reg msf_carrier_pulse;
     reg one_sec_marker;
     reg [12:0] number_msf_periods;
 
 	// Outputs
-	wire [15:0] average;
+	wire signed [15:0] average;
 	wire valid;
 	wire signed [23:0] accumulator;
-	wire [12:0] counter;
+	wire[12:0] counter;
+
+
 
 	
 	// Testvars for runlength-testing
@@ -32,14 +34,14 @@ module averager_tb;
 		.rst(rst),
 		.amplitude(amplitude),
 		.load_val(load_val),
-                .msf_carrier_pulse(msf_carrier_pulse),
-                .one_sec_marker(one_sec_marker),
-                .number_msf_periods(number_msf_periods),
+        .msf_carrier_pulse(msf_carrier_pulse),
+        .one_sec_marker(one_sec_marker),
+        .number_msf_periods(number_msf_periods),
 		.average(average),
 		.valid(valid),
-		.accumulator(accumulator),
-		.counter(counter)
-
+		.counter(counter),
+		.accumulator(accumulator)
+		
 	);
 
 
@@ -53,10 +55,10 @@ module averager_tb;
 		amplitude = 0;
 		load_val = 0;
         one_sec_marker=0;
-        number_msf_periods=825;
-
+        number_msf_periods=16;
+  msf_carrier_pulse=0;
 		// Wait 100 ns for global reset to finish
-		#100;
+		#(10*CLK_PERIOD);
 		rst = 0;
 
 		#(CLK_PERIOD)
@@ -83,7 +85,7 @@ always begin
   end
   
 always begin
-  #(319*CLK_PERIOD)
+  #(500*CLK_PERIOD)
   load_val=1;
   #(CLK_PERIOD)
   load_val=0;

@@ -13,7 +13,7 @@ source $board_path/analogue.tcl
 #create_bd_port -dir I -from 7 -to 0 pmod_ja
 create_bd_port -dir O -from 7 -to 0 pmod_jb
 
-create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 data_clk_in
+#create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 data_clk_in <This doesn't do anything!
 
 create_bd_port -dir O CS5340_MCLK
 create_bd_port -dir O Button_Active
@@ -732,8 +732,8 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 qpsk_tx_axis_fifo {
   C_USE_TX_CTRL 0
   C_USE_TX_CUT_THROUGH true
 
-  C_QPSK_TX_FIFO_DEPTH 4096
-  C_QPSK_TX_FIFO_PF_THRESHOLD 4000
+  C_QPSK_TX_FIFO_DEPTH 1024
+  C_QPSK_TX_FIFO_PF_THRESHOLD 1000
   C_QPSK_TX_FIFO_PE_THRESHOLD 6
 } {
   s_axi_aclk [set ps_clk$intercon_idx]
@@ -761,12 +761,11 @@ cell GN:user:QPSK_tx_timing:1.0 qpsk_tx_control {
 
 } {
 msf_carrier_pulse  msf_carrier_pulse/res
-msf_cp_per_bit     ctl/qpsk_bit_length
+msf_cp_per_bit     [get_slice_pin ctl/qpsk_bit_length 12 0]
 one_sec_pulse      msf_BRAM_timing/one_sec_marker
 clk                $adc_clk
 qpsk_start         [get_slice_pin ctl/control 6 6]
 next_output        qpsk_tx_clock_converter/m_axis_tready
-
 
 }
 
@@ -1365,11 +1364,23 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
   m_axis_aclk [set ps_clk$intercon_idx]
 }
 
+
+cell xilinx.com:ip:c_counter_binary:12.0 one_bit_count {
+Output_Width 1
+CE true
+} {
+  clk $adc_clk
+  ce qpsk_tx_control/next_output
+}
+
+
 #Output the bitclock (counts up to 16 x qpsk monitor periods, so rising edge of bit 2 could be used as 64ms period clock - or toggle of bit 3 for transmit)
 #send to a status register and a port pin
 #use bit 0 toggling to grab the I/Q values when receiveing
 connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status]
-connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
+connect_port_pin TestOut qpsk_tx_control/qpsk_go
+#one_bit_count/Q
+# was msf_BRAM_timing/one_sec_marker now counts tx axis valid pulses to give square pulse with period twice the output data period (should be 12.5Hz)
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 
 set idx [add_master_interface $intercon_idx]
@@ -1378,14 +1389,14 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 iq_ave_fifo {
   C_USE_TX_DATA 0
   C_USE_TX_CTRL 0
   C_USE_RX_CUT_THROUGH true
-  C_RX_FIFO_DEPTH 512
-  C_RX_FIFO_PF_THRESHOLD 500
+  C_RX_FIFO_DEPTH 1024
+  C_RX_FIFO_PF_THRESHOLD 1000
 } {
   s_axi_aclk [set ps_clk$intercon_idx]
   s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
   S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
   axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
-  axi_str_rxd_tdata   [get_concat_pin [list msf_BRAM_timing/one_sec_marker  [get_slice_pin adc_clock_converter_i/m_axis_tdata 14 0] adc_clock_converter_q/m_axis_tdata  ] IQdata]
+  axi_str_rxd_tdata   [get_concat_pin [list adc_clock_converter_i/m_axis_tdata adc_clock_converter_q/m_axis_tdata  ] IQdata]
 }
 
 
@@ -1523,4 +1534,4 @@ set_property range  [get_memory_range axi_uart]  $memory_segment_axi_uart
   connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
   connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
 
-  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt axi_uartlite_0/interrupt ] ] 
+  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt qpsk_tx_axis_fifo/interrupt iq_ave_fifo/interrupt axi_uartlite_0/interrupt ] ] 

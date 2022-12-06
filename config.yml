@@ -37,24 +37,26 @@ memory:
     range: 4K
 
   - name: xadc
-    offset: '0x40007000'
-    range: 4K
-
-  - name: data_fifo
-    offset: '0x43C10000'
-    range: 16K
-
-  - name: tx_fifo
-    offset: '0x43C20000'
-    range: 16K
-
-  - name: qpsk_tx_fifo
-    offset: '0x43C30000'
+    offset: '0x43C00000'
     range: 4K
 
   - name: ave_iq_fifo
+    offset: '0x43C10000'
+    range: 4K
+
+  - name: data_fifo
+    offset: '0x43C20000'
+    range: 16K
+
+  - name: tx_fifo
+    offset: '0x43C30000'
+    range: 16K
+
+  - name: qpsk_tx_fifo
     offset: '0x43C40000'
-    range: 2K
+    range: 4K
+
+
 
   - name: axi_uart
     offset: '0x42C00000'
@@ -83,7 +85,6 @@ control_registers:
   - ssb_tx_frequency
   - display_o
   - lcd
-  - qpsk
   - volume
   - agc_value
   - mult_agc_value
@@ -95,7 +96,14 @@ control_registers:
 
 
 
-#control bits: 0 upper or lower side band on reception, 1 TX_high, 2:3 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q), bit 4 select input to FIRs (0 for RX,1 for TX), bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
+#control bits: 0 upper or lower side band on reception
+# 1 TX_high - enable SSBIQ (needed for both voice and qpsk)
+#2,3 and 7 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q)
+#bit 4 select input to FIRs (0 for RX,1 for TX)
+#bit 5 selects ADC input (when set selects the  ADC which has the microphone, reset for normal input from antenna)
+#bit 6 selects QPSK of SSB transmitter if set. If 0 then normal SSB voice TX (but still requires 1 to be set!)
+#bit 7 used above
+#bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
 #display bits (control): 0:DRST, 1:D_C, 2:ECS, 3:ENA, 4:SRCS, 5:SDCS
 
 status_registers:
