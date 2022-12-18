@@ -19,9 +19,9 @@ cores:
   - ./cores/ssbiq_modulator_v1_0
   - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
-  - ./cores/IQ_averager_v1_1
+  - ./cores/IQ_averager_v1_2
   - ./cores/timing_control_msf_v1_0
-  - ./cores/QPSK_tx_timing_v1_0
+  - ./cores/QPSK_timing_v1_1
 
 memory:
   - name: control
@@ -32,6 +32,10 @@ memory:
     offset: '0x60008000'
     range: 16K
 
+  - name: IQBRAM
+    offset: '0x60040000'
+    range: 64K
+
   - name: status
     offset: '0x50000000'
     range: 4K
@@ -40,22 +44,14 @@ memory:
     offset: '0x43C00000'
     range: 4K
 
-  - name: ave_iq_fifo
+  - name: tx_fifo
     offset: '0x43C10000'
-    range: 4K
+    range: 16K
+
 
   - name: data_fifo
     offset: '0x43C20000'
     range: 16K
-
-  - name: tx_fifo
-    offset: '0x43C30000'
-    range: 16K
-
-  - name: qpsk_tx_fifo
-    offset: '0x43C40000'
-    range: 4K
-
 
 
   - name: axi_uart
@@ -65,11 +61,11 @@ memory:
 
 
   - name: ck_iic
-    offset: '0x40005000'
+    offset: '0x40002000'
     range: 4K
 
   - name: axi_spi
-    offset: '0x40006000'
+    offset: '0x40003000'
     range: 4K
 
 #agc_value has 2 16 bit values used as gain in the multipliers, bit length is in number of carrier pulses (3100 for text) - phase repeated for 2 bit lengths!
@@ -89,8 +85,8 @@ control_registers:
   - agc_value
   - mult_agc_value
   - msf_agc_value
-  - IQ_average_length
-  - qpsk_bit_length
+
+
 
 
 

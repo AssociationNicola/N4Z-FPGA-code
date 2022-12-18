@@ -724,51 +724,6 @@ cell xilinx.com:ip:axis_clock_converter:1.1 tx_clock_converter {
   s_axis_aclk [set ps_clk$intercon_idx]
 }
 
-#Add fifo for qpsk transmit stream
-set idx [add_master_interface $intercon_idx]
-#BT mic input 
-cell xilinx.com:ip:axi_fifo_mm_s:4.1 qpsk_tx_axis_fifo {
-  C_USE_RX_DATA 0
-  C_USE_TX_CTRL 0
-  C_USE_TX_CUT_THROUGH true
-
-  C_QPSK_TX_FIFO_DEPTH 1024
-  C_QPSK_TX_FIFO_PF_THRESHOLD 1000
-  C_QPSK_TX_FIFO_PE_THRESHOLD 6
-} {
-  s_axi_aclk [set ps_clk$intercon_idx]
-  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
-
-}
-
-#Data to ssbiq modulator:  [get_slice_pin qpsk_tx_clock_converter/m_axis_tdata 26 0]
-
-cell xilinx.com:ip:axis_clock_converter:1.1 qpsk_tx_clock_converter {
-  TDATA_NUM_BYTES 4
-} {
-  s_axis_tdata qpsk_tx_axis_fifo/axi_str_txd_tdata  
-  s_axis_tvalid qpsk_tx_axis_fifo/axi_str_txd_tvalid
-  s_axis_tready qpsk_tx_axis_fifo/axi_str_txd_tready
-
-  m_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
-  s_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  m_axis_aclk $adc_clk
-  s_axis_aclk [set ps_clk$intercon_idx]
-}
-
-cell GN:user:QPSK_tx_timing:1.0 qpsk_tx_control {
-
-} {
-msf_carrier_pulse  msf_carrier_pulse/res
-msf_cp_per_bit     [get_slice_pin ctl/qpsk_bit_length 12 0]
-one_sec_pulse      msf_BRAM_timing/one_sec_marker
-clk                $adc_clk
-qpsk_start         [get_slice_pin ctl/control 6 6]
-next_output        qpsk_tx_clock_converter/m_axis_tready
-
-}
-
 
 
 #2022 put AGC here controlled by ARM with level monitor after it. But will need a cordic to get the amplitude
@@ -1087,6 +1042,62 @@ connect_pin [sts_pin average_amplitude] [get_concat_pin [list level_monitor/aver
 connect_pin [sts_pin max_amplitude] [get_concat_pin [list level_monitor/max_val level_monitor_cic/max_val] max_cic_fir]
 
 
+
+
+
+
+cell GN:user:QPSK_timing:1.1 qpsk_timing {
+} {
+cic_40_pulse cic_i/m_axis_data_tvalid
+rst  $rst_adc_clk_name/peripheral_reset
+one_sec_pulse  msf_BRAM_timing/one_sec_marker
+clk $adc_clk
+
+}
+
+cell GN:user:IQ_averager:1.2 i_average {
+NBITS  16
+ABITS  2
+
+} {
+cic_40_pulse cic_i/m_axis_data_tvalid
+rst  $rst_adc_clk_name/peripheral_reset
+amplitude  agc_cic_i/P
+clk $adc_clk
+
+}
+
+cell GN:user:IQ_averager:1.2 q_average {
+NBITS  16
+ABITS  2
+
+} {
+cic_40_pulse cic_q/m_axis_data_tvalid
+rst  $rst_adc_clk_name/peripheral_reset
+amplitude  agc_cic_q/P
+clk $adc_clk
+
+}
+
+
+
+set TXhigh_write [get_and_pin i_average/valid  [get_slice_pin ctl/control 1 1] ]
+
+
+add_bram_sender  IQ_bram IQBRAM
+connect_cell IQ_bram {
+  clk $adc_clk
+  rst $rst_adc_clk_name/peripheral_reset
+  addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin qpsk_timing/cic_pulse_counter 15 2] ] padded_iqram_addr ]
+  wen [get_concat_pin [list $TXhigh_write $TXhigh_write $TXhigh_write $TXhigh_write ] IQramWrite ]
+  data_in [get_concat_pin [list  i_average/average q_average/average ] IQconcat_ave]
+}
+
+
+#End IQBRAM insert
+
+
+
 #Dec 21 insert mux to switch to fixed (2**25-2**20) QPSK amplitude when control bit 6 set to 1
 #SSB bit was "[get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude]" but tried scaling a factor of 2 (dec 2021)
 
@@ -1118,7 +1129,7 @@ NBITS 24
  amplitude [get_Q_pin [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude] 1 noce clk_wiz_1/clk_out1 latched_amplitude]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
  set_qpsk [get_slice_pin ctl/control 6 6]
- qpsk_phase [get_slice_pin qpsk_tx_clock_converter/m_axis_tdata 26 0]
+ qpsk_phase [get_slice_pin IQ_bram/data_out 26 0]
 }
 
 #cell GN:user:photodiode_delay:1.0 pd_delays {
@@ -1305,64 +1316,6 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
   axi_str_rxd_tdata   adc_clock_converter/m_axis_tdata
 }
 
-#Take i from agc_cic_i/P and similarly q -This needs to be changed to v1_1 that counts msf carrier pulses!
-#ABITS is a bit of a compromise and assumes with average length set to 775 not all the summed amplitudes will be at top values
-
-
-cell GN:user:IQ_averager:1.1 i_averaged {
-NBITS 16
-ABITS 12
-} {
- clk $adc_clk
- rst $rst_adc_clk_name/peripheral_reset
- amplitude agc_cic_i/P
- load_val cic_i/m_axis_data_tvalid
- msf_carrier_pulse msf_carrier_pulse/res
- one_sec_marker msf_BRAM_timing/one_sec_marker
- number_msf_periods [get_slice_pin ctl/IQ_average_length 12 0]
-}
-
-
-
-cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_i {
-  TDATA_NUM_BYTES 2
-} {
-  s_axis_tdata i_averaged/average
-  s_axis_tvalid i_averaged/valid
-  s_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
-  m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  s_axis_aclk $adc_clk
-  m_axis_aclk [set ps_clk$intercon_idx]
-}
-
-
-
-cell GN:user:IQ_averager:1.1 q_averaged {
-NBITS 16
-ABITS 12
-} {
- clk $adc_clk
- rst $rst_adc_clk_name/peripheral_reset
- amplitude agc_cic_q/P
- load_val cic_q/m_axis_data_tvalid
- msf_carrier_pulse msf_carrier_pulse/res
- one_sec_marker msf_BRAM_timing/one_sec_marker
- number_msf_periods [get_slice_pin ctl/IQ_average_length 12 0]
-
-}
-
-
-
-cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter_q {
-  TDATA_NUM_BYTES 2
-} {
-  s_axis_tdata q_averaged/average
-  s_axis_tvalid q_averaged/valid
-  s_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
-  m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  s_axis_aclk $adc_clk
-  m_axis_aclk [set ps_clk$intercon_idx]
-}
 
 
 cell xilinx.com:ip:c_counter_binary:12.0 one_bit_count {
@@ -1370,34 +1323,13 @@ Output_Width 1
 CE true
 } {
   clk $adc_clk
-  ce qpsk_tx_control/next_output
+  ce qpsk_timing/write
 }
 
-
-#Output the bitclock (counts up to 16 x qpsk monitor periods, so rising edge of bit 2 could be used as 64ms period clock - or toggle of bit 3 for transmit)
-#send to a status register and a port pin
-#use bit 0 toggling to grab the I/Q values when receiveing
 connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status]
-connect_port_pin TestOut qpsk_tx_control/qpsk_go
-#one_bit_count/Q
+connect_port_pin TestOut one_bit_count/Q
 # was msf_BRAM_timing/one_sec_marker now counts tx axis valid pulses to give square pulse with period twice the output data period (should be 12.5Hz)
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
-
-set idx [add_master_interface $intercon_idx]
-#concat i and q data - but replace the lowest bit with the second marker!
-cell xilinx.com:ip:axi_fifo_mm_s:4.1 iq_ave_fifo {
-  C_USE_TX_DATA 0
-  C_USE_TX_CTRL 0
-  C_USE_RX_CUT_THROUGH true
-  C_RX_FIFO_DEPTH 1024
-  C_RX_FIFO_PF_THRESHOLD 1000
-} {
-  s_axi_aclk [set ps_clk$intercon_idx]
-  s_axi_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
-  S_AXI [set interconnect_${intercon_idx}_name]/M${idx}_AXI
-  axi_str_rxd_tvalid adc_clock_converter_i/m_axis_tvalid
-  axi_str_rxd_tdata   [get_concat_pin [list adc_clock_converter_i/m_axis_tdata adc_clock_converter_q/m_axis_tdata  ] IQdata]
-}
 
 
 
@@ -1475,17 +1407,6 @@ set memory_segment_tx  [get_bd_addr_segs /${::ps_name}/Data/SEG_tx_axis_fifo_Mem
 set_property offset [get_memory_offset tx_fifo] $memory_segment_tx
 set_property range  [get_memory_range tx_fifo]  $memory_segment_tx
 
-assign_bd_address [get_bd_addr_segs qpsk_tx_axis_fifo/S_AXI/Mem0]
-set memory_segment_qpsk_tx  [get_bd_addr_segs /${::ps_name}/Data/SEG_qpsk_tx_axis_fifo_Mem0]
-set_property offset [get_memory_offset qpsk_tx_fifo] $memory_segment_qpsk_tx
-set_property range  [get_memory_range qpsk_tx_fifo]  $memory_segment_qpsk_tx
-
-
-
-assign_bd_address [get_bd_addr_segs iq_ave_fifo/S_AXI/Mem0]
-set memory_segment_iq_ave  [get_bd_addr_segs /${::ps_name}/Data/SEG_iq_ave_fifo_Mem0]
-set_property offset [get_memory_offset ave_iq_fifo] $memory_segment_iq_ave
-set_property range  [get_memory_range ave_iq_fifo]  $memory_segment_iq_ave
 
 #Add these asignments to try and get Uart1 to work
 assign_bd_address [get_bd_addr_segs axi_uartlite_0/S_AXI/Reg]
@@ -1534,4 +1455,4 @@ set_property range  [get_memory_range axi_uart]  $memory_segment_axi_uart
   connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
   connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
 
-  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt qpsk_tx_axis_fifo/interrupt iq_ave_fifo/interrupt axi_uartlite_0/interrupt ] ] 
+  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt  axi_uartlite_0/interrupt ] interrupt_vec] 

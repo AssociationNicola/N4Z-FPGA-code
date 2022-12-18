@@ -24,6 +24,9 @@ class Nicola4Z(object):
         self.control_val = 0
         self.SecondBRAM_size = self.get_SecondBRAM_size()
         self.SecondBRAM = np.zeros((1, self.SecondBRAM_size))
+        self.IQBRAM_size = self.get_IQBRAM_size()
+        self.IQBRAM = np.zeros((1, self.IQBRAM_size))
+
 
     @command()
     def get_SecondBRAM_size(self):
@@ -32,6 +35,44 @@ class Nicola4Z(object):
     @command()
     def get_SecondBRAM(self):
         self.SecondBRAM = self.client.recv_array(self.SecondBRAM_size, dtype='int32')
+
+    @command()
+    def get_IQBRAM_size(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_IQBRAM(self):
+        self.IQBRAM = self.client.recv_array(self.IQBRAM_size, dtype='int32')
+
+
+#For this to send data to the IQBRAM, the 32 bit data needs to be pre-loaded into eg driver.IQdata numpy array
+    def set_IQBRAM(self):
+        @command()
+        def set_IQBRAM_data(self, data):
+            pass
+        set_IQBRAM_data(self, self.IQdata)
+
+
+
+
+
+    def set_QCLramp(self):
+        @command()
+        def set_QCLramp_data(self, data):
+            pass
+        # Conversion to two's complement:
+        data1 = np.uint32(np.mod(np.floor(32768 * self.QCLramp[0, :]) + 32768, 65536) + 32768)
+        data2 = np.uint32(np.mod(np.floor(32768 * self.QCLramp[1, :]) + 32768, 65536) + 32768)
+        set_QCLramp_data(self, data1 + (data2 << 16))
+
+
+
+
+
+
+
+
+
 
     @command()
     def get_fifo_occupancy(self):
@@ -54,26 +95,12 @@ class Nicola4Z(object):
         pass
 
     @command()
-    def reset_qpsk_tx_fifo(self):
-        pass
-
-    @command()
     def get_tx_fifo_vacancy(self):
         return self.client.recv_uint32()
 
     @command()
     def get_tx_fifo_occupancy(self):
         return self.client.recv_uint32()
-
-    @command()
-    def write_250_qpsk_data(self,data):
-        pass
-
-    @command()
-    def get_qpsk_tx_fifo_vacancy(self):
-        return self.client.recv_uint32()
-
-
 
     @command()
     def read_data(self):
@@ -91,42 +118,6 @@ class Nicola4Z(object):
     @command()
     def get_dna(self):
         return self.client.recv_uint64()
-
-
-
-#I and Q ave fifo read functions (values concatenated to be in sync):
-    @command()
-    def get_IQave_fifo_occupancy(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_IQave_fifo_length(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def reset_IQave_fifo(self):
-        pass
-
-    @command()
-    def read_IQave(self):
-        return self.client.recv_array(512, dtype='int32', check_type=False)
-
-    @command()
-    def read_25_IQave(self):
-        return self.client.recv_array(25, dtype='int32', check_type=False)
-
-    @command()
-    def read_250_IQave(self):
-        return self.client.recv_array(250, dtype='int32', check_type=False)
-
-    @command()
-    def read_available_IQave(self):
-        return self.client.recv_array(512, dtype='int32', check_type=False)
-
-
-
-
-#end iave and qave functions
 
 
 
@@ -227,16 +218,6 @@ class Nicola4Z(object):
 
     @command()
     def set_msf_low_time(self, value):
-        pass
-
-#This sets the number of msf carrier periods to average the received I/Q signals over. Typically 2 lots of 3100 msf carrier periods for 25baud text and 11 for 3.5kbaud digital voice comms (2 bits per phase sample which is 4 lots of average values to align the set of 4 to a bit as the bit alignment is more critical and will need to be searched).
-#The IQ_average_length and qpsk_bit_length could be the same (3100 - Frankfurt or 2400/Rugby for text)
-    @command()
-    def set_IQ_average_length(self, value):
-        pass
-
-    @command()
-    def set_qpsk_bit_length(self, value):
         pass
 
 

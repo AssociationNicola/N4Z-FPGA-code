@@ -64,7 +64,17 @@ module ssbiq_modulator #
 		DRV1=0;
 	end
     else begin
-	  accumulator <= accumulator0+qpsk_phase;
+//changed this for BRAM version to stop Q phase modulation when not QPSK
+      if (set_qpsk==0) begin 
+	  accumulator <= accumulator0;
+      end else begin
+	   accumulator <= accumulator0+qpsk_phase;
+
+      end
+  
+
+
+
       if (count < amplitude0) begin
 		DRV0=0;
 		DRV1=1;

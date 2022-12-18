@@ -26,6 +26,7 @@ namespace Fifo_regs {
 
 constexpr uint32_t ARR_SIZE = 1200;
 constexpr uint32_t SecondBRAM_size = mem::SecondBRAM_range/sizeof(uint32_t);
+constexpr uint32_t IQBRAM_size = mem::IQBRAM_range/sizeof(uint32_t);
 
 
 
@@ -39,9 +40,9 @@ class Nicola4Z
     , xadc(ctx.mm.get<mem::xadc>())
     , data_fifo_map(ctx.mm.get<mem::data_fifo>())
     , tx_fifo_map(ctx.mm.get<mem::tx_fifo>())
-    , qpsk_tx_fifo_map(ctx.mm.get<mem::qpsk_tx_fifo>())
-    , ave_iq_fifo_map(ctx.mm.get<mem::ave_iq_fifo>())
     , SecondBRAM_map(ctx.mm.get<mem::SecondBRAM>())
+    , IQBRAM_map(ctx.mm.get<mem::IQBRAM>())
+
 
 
     {
@@ -152,16 +153,6 @@ class Nicola4Z
         ctl.write<reg::msf_frequency>(value/250);
     }
 
-//This is the number of msf carrier pulses to average over before sending to fifo
-    void set_IQ_average_length(uint32_t value) {
-        ctl.write<reg::IQ_average_length>(value);
-    }
-
-    void set_qpsk_bit_length(uint32_t value) {
-        ctl.write<reg::qpsk_bit_length>(value);
-    }
-
-
     void set_msf_low_time(uint32_t value) {
         ctl.write<reg::msf_low_time>(value);
     }
@@ -213,26 +204,6 @@ class Nicola4Z
 
 
 
-
-    uint32_t get_qpsk_tx_fifo_vacancy() {
-        return qpsk_tx_fifo_map.read<Fifo_regs::tdfv>();
-    }
-
-    uint32_t get_qpsk_tx_fifo_occupancy() {
-        return qpsk_tx_fifo_map.read<Fifo_regs::rdfo>();
-    }
-
-
-
-    void reset_qpsk_tx_fifo() {
-        qpsk_tx_fifo_map.write<Fifo_regs::tdfr>(0x000000A5);
-    }
-
-    void write_qpsk_fifo(int32_t val) {
-        qpsk_tx_fifo_map.write<Fifo_regs::tdfd>(val);
-    }
-
-
     uint32_t get_fifo_length() {
         return (data_fifo_map.read<Fifo_regs::rlr>() & 0x3FFFFF) >> 2;
     }
@@ -266,12 +237,6 @@ class Nicola4Z
         }
     }
 
-    void write_250_qpsk_data(const std::array<int32_t, 250>& data) {
-        for (unsigned int i=0; i < 250; i++) {
-            write_qpsk_fifo(data[i]);
-        }
-    }
-
 
     auto& read_available_data() {
         uint32_t no_available=get_fifo_length();
@@ -287,71 +252,7 @@ class Nicola4Z
     }
 
 
-//Now add fifo for <IQave> - note this fifo is only 1024 long!
-    uint32_t get_IQave_fifo_occupancy() {
-        return ave_iq_fifo_map.read<Fifo_regs::rdfo>();
-    }
 
-
-    void reset_IQave_fifo() {
-        ave_iq_fifo_map.write<Fifo_regs::rdfr>(0x000000A5);
-    }
-
-   uint32_t read_IQave_fifo() {
-        return ave_iq_fifo_map.read<Fifo_regs::rdfd>();
-    }
-
-
-
-    uint32_t get_IQave_fifo_length() {
-        return (ave_iq_fifo_map.read<Fifo_regs::rlr>() & 0x3FFFFF) >> 2;
-    }
-
-    void wait_for_IQave_n_pts(uint32_t n_pts) {
-        do {} while (get_IQave_fifo_length() < n_pts);
-    }
-
-    auto& read_IQave() {
-        wait_for_IQave_n_pts(512);
-        for (unsigned int i=0; i < 512; i++) {
-            data[i] = read_IQave_fifo();
-        }
-        return data;
-    }
-
-    auto& read_25_IQave() {
-        wait_for_IQave_n_pts(25);
-        for (unsigned int i=0; i < 25; i++) {
-            data[i] = read_IQave_fifo();
-        }
-        return data;
-    }
-
-    auto& read_250_IQave() {
-        wait_for_IQave_n_pts(250);
-        for (unsigned int i=0; i < 250; i++) {
-            data[i] = read_IQave_fifo();
-        }
-        return data;
-    }
-
-
-
-
-    auto& read_available_IQave() {
-        uint32_t no_available=get_IQave_fifo_length();
-        for (unsigned int i=0; i < no_available; i++) {
-            data[i] = read_IQave_fifo();
-        }
-        for (unsigned int i=no_available; i < 511; i++) {
-            data[i] = 0;
-        }
-        data[511] = no_available;
-
-        return data;
-    }
-
-//end <IQave>
 //BRAM additions
     std::array<int32_t, SecondBRAM_size> get_SecondBRAM() {
         return SecondBRAM_map.read_array<int32_t, SecondBRAM_size>();
@@ -361,6 +262,27 @@ class Nicola4Z
     uint32_t get_SecondBRAM_size() {
         return SecondBRAM_size;
     }
+
+
+    std::array<int32_t, IQBRAM_size> get_IQBRAM() {
+        return IQBRAM_map.read_array<int32_t, IQBRAM_size>();
+    }
+
+
+    uint32_t get_IQBRAM_size() {
+        return IQBRAM_size;
+    }
+
+//Now for writing to IQBRAM:
+
+    void set_IQBRAM_data(const std::array<uint32_t, IQBRAM_size>& data) {
+        IQBRAM_map.write_array(data);
+    }
+
+
+
+
+
 
 
 
@@ -373,9 +295,8 @@ class Nicola4Z
     Memory<mem::xadc>& xadc;
     Memory<mem::data_fifo>& data_fifo_map;
     Memory<mem::tx_fifo>& tx_fifo_map;
-    Memory<mem::qpsk_tx_fifo>& qpsk_tx_fifo_map;
-    Memory<mem::ave_iq_fifo>& ave_iq_fifo_map;
     Memory<mem::SecondBRAM>& SecondBRAM_map;
+    Memory<mem::IQBRAM>& IQBRAM_map;
 
     std::array<uint32_t, ARR_SIZE> data;
 
