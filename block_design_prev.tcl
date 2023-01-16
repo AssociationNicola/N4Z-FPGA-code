@@ -346,11 +346,11 @@ cell xilinx.com:ip:cordic:6.0 cordic_msf_mult_level_mon {
 
 }
 
-#averager:1.0 is for unsigned amplitudes (eg from a cordic), whereas averager:1.1 is for signed values such as i and q signals
-cell GN:user:mag_averager:1.0 msf_level_monitor_mult {
-ABITS 12
-NBITS 16
 
+cell GN:user:averager:1.1 msf_level_monitor_mult {
+ABITS 12
+AMBITS 8
+SKIPBITS 4
 } {
 clk $adc_clk
 next cordic_msf_mult_level_mon/m_axis_dout_tvalid
@@ -484,10 +484,10 @@ rst $rst_adc_clk_name/peripheral_reset
 amplitude [get_Q_pin agc_cic_msf_q/P 1 cic_msf_q/m_axis_data_tvalid $adc_clk cic_msf_q_latched ]
 }
 
-cell GN:user:mag_averager:1.0 level_monitor_cic_msf {
+cell GN:user:averager:1.1 level_monitor_cic_msf {
 ABITS 5
-NBITS 16
-
+AMBITS 4
+SKIPBITS 1
 } {
 clk $adc_clk
 next cordic_cic_msf_level_mon/m_axis_dout_tvalid
@@ -506,11 +506,47 @@ connect_pin [sts_pin msf_average_amplitude]  [get_concat_pin [list level_monitor
 connect_pin [sts_pin msf_i] [get_concat_pin [list level_monitor_cic_msf_i/average [get_constant_pin 0 16 ] ] msf_average_i]
 connect_pin [sts_pin msf_q] [get_concat_pin [list level_monitor_cic_msf_q/average [get_constant_pin 0 16 ] ] msf_average_q]
 
+#This is to look at the phase change of the msf signal after the cic (~250Hz rate with 800 decimation)
+cell xilinx.com:ip:c_addsub:12.0 msf_diff_phase {
+B_Width.VALUE_SRC USER 
+A_Width.VALUE_SRC USER 
+A_Type.VALUE_SRC USER
+
+Implementation Fabric 
+A_Width 16 
+B_Width 16 
+Add_Mode Subtract 
+Out_Width 17 
+CE false 
+Latency 1 
+B_Value 0000000000000000
+
+} {
+A [get_Q_pin [get_slice_pin cordic_cic_msf_level_mon/m_axis_dout_tdata 31 16] 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_cordic_phase_latched ]
+B [get_Q_pin msf_cordic_phase_latched/Q 1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk]
+CLK $adc_clk
+
+}
+
+cell GN:user:averager:1.1 level_monitor_msf_diff_phase {
+ABITS 5
+AMBITS 4
+SKIPBITS 1
+} {
+clk $adc_clk
+next cordic_cic_msf_level_mon/m_axis_dout_tvalid
+rst $rst_adc_clk_name/peripheral_reset
+amplitude [get_concat_pin [list [get_constant_pin 0 2] [get_Q_pin [get_slice_pin msf_diff_phase/S 13 0]  1 cordic_cic_msf_level_mon/m_axis_dout_tvalid $adc_clk msf_diff_phase_latched_short ] ] msf_diff_phase_latched]
+}
+
+
+
+connect_pin [sts_pin msf_diff_phase]  [get_concat_pin [list level_monitor_msf_diff_phase/average [get_constant_pin 0 16 ] ] msf_padded_diff_phase]
 
 #end msf with agc
 
 #Timing control
-cell GN:user:timing_control_msf:1.0 msf_BRAM_timing {
+cell GN:user:timing_control_msf msf_BRAM_timing {
 } {
 msf_carrier_pulse [get_and_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31] [get_not_pin  [get_Q_pin [get_slice_pin dds_msf/m_axis_data_tdata 31 31]  1 noce $adc_clk delayed_dds] ]  msf_carrier_pulse]
 
@@ -520,7 +556,7 @@ rst [get_slice_pin ctl/control 15 15]
 clk $adc_clk
 }
 
-
+connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 15]]]
 
 
 #Now add library to introduce block rams read for PS interface - or should we be using bram_recorder instead?:
@@ -553,10 +589,10 @@ cell xilinx.com:ip:cordic:6.0 cordic_mult_level_mon {
 
 #Now try longer time constant monitor
 #Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
-cell GN:user:mag_averager:1.0 level_monitor_mult {
+cell GN:user:averager:1.1 level_monitor_mult {
 ABITS 12
-NBITS 16
-
+AMBITS 8
+SKIPBITS 4
 } {
 clk $adc_clk
 next cordic_mult_level_mon/m_axis_dout_tvalid
@@ -750,10 +786,10 @@ cell xilinx.com:ip:cordic:6.0 cordic_cic_level_mon {
 
 #use new level monitor to slow decay
 #Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
-cell GN:user:mag_averager:1.0 level_monitor_cic {
-ABITS 5
-NBITS 16
-
+cell GN:user:averager:1.1 level_monitor_cic {
+ABITS 9
+AMBITS 8
+SKIPBITS 3
 } {
 clk $adc_clk
 next cordic_cic_level_mon/m_axis_dout_tvalid
@@ -990,10 +1026,10 @@ CLK $adc_clk
 
 #Slow FIR time constant to ~0.5s
 #Speed it up again by knocking 4 bits off ABITS and SKIPBITS June 2022
-cell GN:user:mag_averager:1.0 level_monitor {
-ABITS 8
-NBITS 16
-
+cell GN:user:averager:1.1 level_monitor {
+ABITS 9
+AMBITS 8
+SKIPBITS 1
 } {
 clk $adc_clk
 next cordic_ssb/m_axis_dout_tvalid
@@ -1014,13 +1050,10 @@ cell GN:user:QPSK_timing:1.1 qpsk_timing {
 } {
 cic_40_pulse cic_i/m_axis_data_tvalid
 rst  $rst_adc_clk_name/peripheral_reset
-
+one_sec_pulse  msf_BRAM_timing/one_sec_marker
 clk $adc_clk
 
 }
-
-
-#Now QPSK reading is averaged over 4 40ksps CIC values and not msf timing so should use regular average (IQ_averager_1_2) not IQ_averager1,1 , but BRAM writing is synced to 1s timing from MSF
 
 cell GN:user:IQ_averager:1.2 i_average {
 NBITS  16
@@ -1047,8 +1080,8 @@ clk $adc_clk
 }
 
 
-#Need to write IQBRAM only on RX!
-set TX_not_high_write [get_and_pin i_average/valid  [get_not_pin [get_slice_pin ctl/control 1 1]] ]
+
+set TXhigh_write [get_and_pin i_average/valid  [get_slice_pin ctl/control 1 1] ]
 
 
 add_bram_sender  IQ_bram IQBRAM
@@ -1056,14 +1089,10 @@ connect_cell IQ_bram {
   clk $adc_clk
   rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin qpsk_timing/cic_pulse_counter 15 2] ] padded_iqram_addr ]
-  wen [get_concat_pin [list $TX_not_high_write $TX_not_high_write $TX_not_high_write $TX_not_high_write ] IQramWrite ]
-  data_in [get_concat_pin [list [get_slice_pin msf_bram_timing/second_250_counter 3 0] [get_slice_pin i_average/average 15 4] [get_slice_pin msf_bram_timing/second_250_counter 7 4] [get_slice_pin q_average/average 15 4] ] IQconcat_ave]
+  wen [get_concat_pin [list $TXhigh_write $TXhigh_write $TXhigh_write $TXhigh_write ] IQramWrite ]
+  data_in [get_concat_pin [list  i_average/average q_average/average ] IQconcat_ave]
 }
 
-
-
-#Note this reads the carrier counter 0-3999 (advancing at 250Hz) which modulo 250 gives the timing within the second cycle if you subtract 'low_time'. The upper 16 bits have the IQBRAM address (which increments in 4 at 10kHz) corresponding to that time in the cycle.
-connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 4]  padded_iqram_addr/dout]]
 
 #End IQBRAM insert
 
@@ -1176,13 +1205,14 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
             clken [get_constant_pin 1 1]
             din [get_concat_pin [list \
   [get_concat_pin [list c_addsub_0/S [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] SSBrx_CORDICamp] \
-  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ] concat_diff_phase_ssb ] \
+  [get_concat_pin [list [get_slice_pin diff_phase/S 15 0] [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0] ]  ] \
   concat_audio_iq/dout \
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
   adc_reader/Audio \
   dds_msf/m_axis_data_tdata \
   concat_msf_IQ/dout \
-  IQconcat_ave/dout \
+  msf_diff_phase/S \
+
  ] data_options ]
 
         }
@@ -1288,17 +1318,17 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
 
 
 
-#cell xilinx.com:ip:c_counter_binary:12.0 one_bit_count {
-#Output_Width 1
-#CE true
-#} {
-#  clk $adc_clk
-#  ce qpsk_timing/write
-#}
+cell xilinx.com:ip:c_counter_binary:12.0 one_bit_count {
+Output_Width 1
+CE true
+} {
+  clk $adc_clk
+  ce qpsk_timing/write
+}
 
 connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status]
-connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
-# was one_bit_count/Q  or msf_BRAM_timing/one_sec_marker now counts tx axis valid pulses to give square pulse with period twice the output data period (should be 12.5Hz)
+connect_port_pin TestOut one_bit_count/Q
+# was msf_BRAM_timing/one_sec_marker now counts tx axis valid pulses to give square pulse with period twice the output data period (should be 12.5Hz)
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
 
 

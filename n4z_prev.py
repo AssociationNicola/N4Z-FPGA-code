@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -50,6 +51,27 @@ class Nicola4Z(object):
         def set_IQBRAM_data(self, data):
             pass
         set_IQBRAM_data(self, self.IQdata)
+
+
+
+
+
+    def set_QCLramp(self):
+        @command()
+        def set_QCLramp_data(self, data):
+            pass
+        # Conversion to two's complement:
+        data1 = np.uint32(np.mod(np.floor(32768 * self.QCLramp[0, :]) + 32768, 65536) + 32768)
+        data2 = np.uint32(np.mod(np.floor(32768 * self.QCLramp[1, :]) + 32768, 65536) + 32768)
+        set_QCLramp_data(self, data1 + (data2 << 16))
+
+
+
+
+
+
+
+
 
 
     @command()
@@ -130,6 +152,10 @@ class Nicola4Z(object):
 
     @command()
     def get_average_amplitude(self):
+        return self.client.recv_uint32()
+
+    @command()
+    def get_msf_diff_phase(self):
         return self.client.recv_uint32()
 
     @command()

@@ -74,6 +74,10 @@ class Nicola4Z
         return sts.read<reg::average_amplitude>();
     }
 
+    uint32_t get_msf_diff_phase() {
+        return sts.read<reg::msf_diff_phase>();
+    }
+
     uint32_t get_average_mult() {
         return sts.read<reg::average_mult>();
     }
@@ -161,7 +165,6 @@ class Nicola4Z
     void set_control(uint32_t value) {
         ctl.write<reg::control>(value);
     }
-
 
 
     // data FIFO

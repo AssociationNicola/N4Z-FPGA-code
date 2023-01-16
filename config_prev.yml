@@ -11,14 +11,12 @@ cores:
   - fpga/cores/axis_constant_v1_0
   - fpga/cores/axis_lfsr_v1_0
   - fpga/cores/pdm_v1_0
-  - fpga/cores/dna_reader_v1_0
   - fpga/cores/comparator_v1_0
   - ./cores/OB_DAC_v1_0
   - ./cores/ad5541_v1_0
   - ./cores/edge_detector_v1_0
   - ./cores/i2s_rx_v1_0
   - ./cores/ssbiq_modulator_v1_0
-  - ./cores/mag_averager_v1_0
   - ./cores/averager_v1_1
   - ./cores/photodiode_delay_v1_0
   - ./cores/IQ_averager_v1_2
@@ -103,7 +101,6 @@ control_registers:
 #bit 7 used above
 #bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
 #display bits (control): 0:DRST, 1:D_C, 2:ECS, 3:ENA, 4:SRCS, 5:SDCS
-#Note msf_carrier_counter contains secondBRAM address 0-3999 in 12 bits (drop lowest two bits and top 2 bits of lower 16bit chunk). Upper 16 bit chunk contains IQBRAM address (0-16383) in upper 14 bits.
 
 status_registers:
   - forty_two
@@ -111,6 +108,7 @@ status_registers:
   - average_mult
   - msf_average_mult
   - msf_average_amplitude
+  - msf_diff_phase
   - msf_i
   - msf_q
   - msf_carrier_counter
