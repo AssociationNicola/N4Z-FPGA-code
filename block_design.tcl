@@ -73,6 +73,19 @@ connect_port_pin user_dio [get_slice_pin [ctl_pin user_io] 6 0]
 connect_pin [sts_pin ck_inner_io] ctl/ssb_tx_frequency
 
 
+# Rename clocks - adc_clk in this is 12.8MHz - ie 64x Sample rate of 200ksps and about 1/8 of the ps clock
+set adc_clk CS5340_SCLK
+
+#/peripheral_reset
+
+
+# Add processor system reset synchronous to adc clock
+set rst_adc_clk_name proc_sys_reset_adc_clk
+cell xilinx.com:ip:proc_sys_reset:5.0 $rst_adc_clk_name {} {
+  ext_reset_in $ps_name/FCLK_RESET0_N
+  slowest_sync_clk $adc_clk
+}
+
 
 
 #Create clock for DAC, data output
@@ -93,38 +106,33 @@ CLKOUT1_PHASE_ERROR 301.6
 
 } {
     clk_in1 ps_0/fclk_clk0
-    reset [get_constant_pin 0 1]
+    reset proc_sys_reset_0/peripheral_reset
 }
 
+
+
+
+#Feb 2023 change input clock to adc_clk to reduce jitter tx to rx and hit 65.536 exactly!
 cell xilinx.com:ip:clk_wiz clk_wiz_1 {
 
+PRIM_IN_FREQ 12.8
+CLKIN1_JITTER_PS 781.25
 CLKOUT1_REQUESTED_OUT_FREQ 65.536 
-MMCM_DIVCLK_DIVIDE 2 
-MMCM_CLKFBOUT_MULT_F 16.875 
-MMCM_CLKOUT0_DIVIDE_F 12.875 
-CLKOUT1_JITTER 188.876 
-CLKOUT1_PHASE_ERROR 137.238
+MMCM_DIVCLK_DIVIDE 1 
+MMCM_CLKFBOUT_MULT_F 64.000 
+MMCM_CLKOUT0_DIVIDE_F 12.500
+MMCM_CLKIN1_PERIOD 78.125 
+CLKOUT1_JITTER 450.069 
+CLKOUT1_PHASE_ERROR 628.490
 
 
 
 } {
-    clk_in1 ps_0/fclk_clk0
-    reset [get_constant_pin 0 1]
+    clk_in1 $adc_clk
+    reset $rst_adc_clk_name/peripheral_reset
 }
 
 #clk_wiz_1/clk_out1 is at 65.536MHz ie 8192 (2^13) times 8kHz
-
-
-# Rename clocks - adc_clk in this is 12.8MHz - ie 64x Sample rate of 200ksps and about 1/8 of the ps clock
-set adc_clk CS5340_SCLK
-
-# Add processor system reset synchronous to adc clock
-set rst_adc_clk_name proc_sys_reset_adc_clk
-cell xilinx.com:ip:proc_sys_reset:5.0 $rst_adc_clk_name {} {
-  ext_reset_in $ps_name/FCLK_RESET0_N
-  slowest_sync_clk $adc_clk
-}
-
 
 
 
@@ -1096,7 +1104,7 @@ NBITS 24
  clk clk_wiz_1/clk_out1
  rst $rst_adc_clk_name/peripheral_reset
  delta_phase [get_slice_pin diff_phase/S 13 0] 
- ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 17 0] 
+ ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 29 0] 
  amplitude [get_Q_pin [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude] 1 noce clk_wiz_1/clk_out1 latched_amplitude]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
  set_qpsk [get_slice_pin ctl/control 6 6]
