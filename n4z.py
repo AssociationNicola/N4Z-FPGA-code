@@ -49,7 +49,7 @@ class Nicola4Z(object):
         @command()
         def set_IQBRAM_data(self, data):
             pass
-        set_IQBRAM_data(self, self.IQdata)
+        set_IQBRAM_data(self, self.IQBRAM)
 
 
     @command()
@@ -211,9 +211,14 @@ class Nicola4Z(object):
 
 #Control bits: 0: (select USB),
 # 1: enable SSB output,
-#[2:3] select data for data fifo (RX): 0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
+#[2:3 + 7] select data for data fifo (RX): 0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
 #4 select input to FIRs: 0 from CIC agcs, 1 from ARM TX fifo (only top 16 bits)
 #5 select input to CICs: 0 from ADC 0 and downconvertor (set by local oscillator), 1 from ADC 1 (Mic input)
+#6 To set QPSK mode (fixed amplitude and phase from IQBRAM
+#7 used with bits 2:3 see above data for fifo
+#14 Set input to speaker DAC (default 0) when set takes input from TX fifo from ARM
+#15 used to reset MSFBram timing (default 0)
+#16 Used to choose what to output to PMOD DAC if fitted during debugging (default 0) if set to 1 takes data from the user_io register
     @command()
     def set_control(self, value):
         self.control_val=value

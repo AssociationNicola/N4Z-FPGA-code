@@ -271,13 +271,15 @@ class Nicola4Z
     }
 
 //Now for writing to IQBRAM:
+//original
+//    void set_IQBRAM_data(const std::array<uint32_t, IQBRAM_size>& data) {
+//        IQBRAM_map.write_array(data);
+//    }
 
-    void set_IQBRAM_data(const std::array<uint32_t, IQBRAM_size>& data) {
-        IQBRAM_map.write_array(data);
+
+    void set_IQBRAM_data(const std::array<uint32_t, IQBRAM_size> data) {
+        IQBRAM_map.write_array<uint32_t, IQBRAM_size>(data);
     }
-
-
-
 
 
 

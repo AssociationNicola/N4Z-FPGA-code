@@ -476,7 +476,7 @@ AMBITS 4
 SKIPBITS 1
 } {
 clk $adc_clk
-next cordic_cic_msf_level_mon/m_axis_dout_tvalid
+next [get_and_pin [get_not_pin [get_slice_pin ctl/control 1 1]] cordic_cic_msf_level_mon/m_axis_dout_tvalid gated_msf_strobeI ]
 rst $rst_adc_clk_name/peripheral_reset
 amplitude [get_Q_pin agc_cic_msf_i/P 1 cic_msf_i/m_axis_data_tvalid $adc_clk cic_msf_i_latched ]
 }
@@ -487,7 +487,7 @@ AMBITS 4
 SKIPBITS 1
 } {
 clk $adc_clk
-next cordic_cic_msf_level_mon/m_axis_dout_tvalid
+next [get_and_pin [get_not_pin [get_slice_pin ctl/control 1 1]] cordic_cic_msf_level_mon/m_axis_dout_tvalid gated_msf_strobeQ ]
 rst $rst_adc_clk_name/peripheral_reset
 amplitude [get_Q_pin agc_cic_msf_q/P 1 cic_msf_q/m_axis_data_tvalid $adc_clk cic_msf_q_latched ]
 }
@@ -539,7 +539,7 @@ connect_cell Sec_bram {
   clk $adc_clk
   rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/address_counter ] padded_ram_addr ]
-  wen msf_BRAM_timing/write_second_bram
+  wen [get_and_pin [get_not_pin [get_slice_pin ctl/control 1 1]] msf_BRAM_timing/write_second_bram gated_msf_write]
   data_in [get_concat_pin [list cic_msf_i_latched/Q cic_msf_q_latched/Q  ] concat_msf_iq]
 }
 
@@ -974,7 +974,8 @@ cell xilinx.com:ip:cordic:6.0 cordic_ssb {
 
 }
 
-
+#This is actually OK - could drop to 14 bit input, but the slicing at the ssb corrects the phase differences as 14 bit signed values (ie -10000 becomes +6834)
+#The data fifo misinterprets it though :-(
 cell xilinx.com:ip:c_addsub:12.0 diff_phase {
 B_Width.VALUE_SRC USER 
 A_Width.VALUE_SRC USER 
@@ -1028,35 +1029,59 @@ clk $adc_clk
 }
 
 
-#Now QPSK reading is averaged over 4 40ksps CIC values and not msf timing so should use regular average (IQ_averager_1_2) not IQ_averager1,1 , but BRAM writing is synced to 1s timing from MSF
+#Now QPSK reading is averaged using an FIR over 4 40ksps CIC values and not msf timing so should use regular average (IQ_averager_1_2) not IQ_averager1,1 , but BRAM writing is synced to 1s timing from MSF. FIR has a notch at 6kHz to remove 81kHz parasite when using 87kHz carrier
 
-cell GN:user:IQ_averager:1.2 i_average {
-NBITS  16
-ABITS  2
 
+set fidi_msf [open $project_path/32_Tap_LPF_6kHzNotchList.txt r]
+
+gets $fidi_msf charsi_msf_rx
+
+set fir_coeffs_msf  $charsi_msf_rx
+puts stdout fir_coeffs_msf
+
+
+
+cell xilinx.com:ip:fir_compiler:7.2 fir_msf_i {
+  Filter_Type Decimation
+  Sample_Frequency [expr [get_parameter adc_clk] / 1000000. / $dec_rate]
+  Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
+  Coefficient_Width 16
+  Data_Width 16
+  Output_Rounding_Mode Convergent_Rounding_to_Even
+  Output_Width 16
+  Decimation_Rate 4
+  BestPrecision true
+  CoefficientVector [subst {{$fir_coeffs_msf}}]
 } {
-cic_40_pulse cic_i/m_axis_data_tvalid
-rst  $rst_adc_clk_name/peripheral_reset
-amplitude  agc_cic_i/P
-clk $adc_clk
+  aclk $adc_clk
+  s_axis_data_tvalid cic_i/m_axis_data_tvalid
+  s_axis_data_tdata agc_cic_i/P
 
 }
 
-cell GN:user:IQ_averager:1.2 q_average {
-NBITS  16
-ABITS  2
-
+cell xilinx.com:ip:fir_compiler:7.2 fir_msf_q {
+  Filter_Type Decimation
+  Sample_Frequency [expr [get_parameter adc_clk] / 1000000. / $dec_rate]
+  Clock_Frequency [expr [get_parameter adc_clk] / 1000000.]
+  Coefficient_Width 16
+  Data_Width 16
+  Output_Rounding_Mode Convergent_Rounding_to_Even
+  Output_Width 16
+  Decimation_Rate 4
+  BestPrecision true
+  CoefficientVector [subst {{$fir_coeffs_msf}}]
 } {
-cic_40_pulse cic_q/m_axis_data_tvalid
-rst  $rst_adc_clk_name/peripheral_reset
-amplitude  agc_cic_q/P
-clk $adc_clk
+  aclk $adc_clk
+  s_axis_data_tvalid cic_q/m_axis_data_tvalid
+  s_axis_data_tdata agc_cic_q/P
 
 }
+
+
 
 
 #Need to write IQBRAM only on RX!
-set TX_not_high_write [get_and_pin i_average/valid  [get_not_pin [get_slice_pin ctl/control 1 1]] ]
+set TX_not_high_write [get_and_pin fir_msf_i/m_axis_data_tvalid  [get_not_pin [get_slice_pin ctl/control 1 1]] ]
 
 
 add_bram_sender  IQ_bram IQBRAM
@@ -1065,7 +1090,7 @@ connect_cell IQ_bram {
   rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin qpsk_timing/cic_pulse_counter 15 2] ] padded_iqram_addr ]
   wen [get_concat_pin [list $TX_not_high_write $TX_not_high_write $TX_not_high_write $TX_not_high_write ] IQramWrite ]
-  data_in [get_concat_pin [list [get_slice_pin msf_bram_timing/second_250_counter 3 0] [get_slice_pin i_average/average 15 4] [get_slice_pin msf_bram_timing/second_250_counter 7 4] [get_slice_pin q_average/average 15 4] ] IQconcat_ave]
+  data_in [get_concat_pin [list [get_slice_pin msf_bram_timing/second_250_counter 3 0] [get_slice_pin fir_msf_i/m_axis_data_tdata 15 4] [get_slice_pin msf_bram_timing/second_250_counter 7 4] [get_slice_pin fir_msf_q/m_axis_data_tdata 15 4] ] IQconcat_ave]
 }
 
 
@@ -1250,6 +1275,51 @@ cell xilinx.com:ip:axis_clock_converter:1.1 adc_clock_converter {
 }
 
 
+
+cell koheron:user:latched_mux:1.0 speaker_mux {
+            WIDTH 16
+    	    N_INPUTS 2
+            SEL_WIDTH 1
+        } {
+            clk ps_0/fclk_clk0 
+            sel [get_slice_pin ctl/control 14 14]
+            clken [get_constant_pin 1 1]
+            din [get_concat_pin [list  [get_slice_pin adc_clock_converter/m_axis_tdata 15 0] [get_slice_pin tx_axis_fifo/axi_str_txd_tdata 15 0]] speaker_select]
+
+        }
+
+cell koheron:user:latched_mux:1.0 speaker_valid {
+            WIDTH 16
+    	    N_INPUTS 2
+            SEL_WIDTH 1
+        } {
+            clk ps_0/fclk_clk0 
+            sel [get_slice_pin ctl/control 14 14]
+            clken [get_constant_pin 1 1]
+            din [get_concat_pin [list  adc_clock_converter/m_axis_tvalid  tx_axis_fifo/axi_str_txd_tvalid ] speaker_strobe]
+
+        }
+
+
+
+cell xilinx.com:ip:axis_clock_converter:1.1 speaker_clock_converter {
+  TDATA_NUM_BYTES 4
+} {
+  s_axis_tdata speaker_mux/dout 
+  s_axis_tvalid speaker_valid/dout 
+
+  m_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  s_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
+  m_axis_aclk clk_wiz_0/clk_out1
+  s_axis_aclk [set ps_clk$intercon_idx]
+}
+
+
+
+
+
+
+
 #Add audio output to one bit dac
 #After rationalising bits (reducing signal to 16 bits) take RX audio from lower 16 bits!
 cell GN:user:OB_DAC:1.0 Audio_Speaker {
@@ -1258,7 +1328,7 @@ cell GN:user:OB_DAC:1.0 Audio_Speaker {
   i_clk clk_wiz_0/clk_out1
   i_res [set rst${intercon_idx}_name]/peripheral_aresetn
   i_ce  [get_constant_pin 1 1]
-  i_func [get_slice_pin adc_clock_converter/m_axis_tdata 15 0]
+  i_func [get_Q_pin speaker_clock_converter/m_axis_tdata 1 noce clk_wiz_0/clk_out1 latched_speaker]
   o_DAC audio_speaker
 }
 
