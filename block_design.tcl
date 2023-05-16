@@ -529,7 +529,7 @@ clk $adc_clk
 }
 
 
-
+set Not_TXHigh [get_not_pin [get_slice_pin ctl/control 1 1]]
 
 #Now add library to introduce block rams read for PS interface - or should we be using bram_recorder instead?:
 source $project_path/tcl/bram_sender.tcl
@@ -539,7 +539,7 @@ connect_cell Sec_bram {
   clk $adc_clk
   rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] msf_BRAM_timing/address_counter ] padded_ram_addr ]
-  wen [get_and_pin [get_not_pin [get_slice_pin ctl/control 1 1]] msf_BRAM_timing/write_second_bram gated_msf_write]
+  wen [get_and_pin [get_concat_pin [list $Not_TXHigh $Not_TXHigh $Not_TXHigh $Not_TXHigh ] NotHighExt] msf_BRAM_timing/write_second_bram gated_msf_write]
   data_in [get_concat_pin [list cic_msf_i_latched/Q cic_msf_q_latched/Q  ] concat_msf_iq]
 }
 
