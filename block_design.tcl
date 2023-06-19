@@ -1090,8 +1090,10 @@ connect_cell IQ_bram {
   rst $rst_adc_clk_name/peripheral_reset
   addr [get_concat_pin [list  [get_constant_pin 0 2] [get_slice_pin qpsk_timing/cic_pulse_counter 15 2] ] padded_iqram_addr ]
   wen [get_concat_pin [list $TX_not_high_write $TX_not_high_write $TX_not_high_write $TX_not_high_write ] IQramWrite ]
-  data_in [get_concat_pin [list [get_slice_pin msf_bram_timing/second_250_counter 3 0] [get_slice_pin fir_msf_i/m_axis_data_tdata 15 4] [get_slice_pin msf_bram_timing/second_250_counter 7 4] [get_slice_pin fir_msf_q/m_axis_data_tdata 15 4] ] IQconcat_ave]
+  data_in [get_concat_pin [list  fir_msf_i/m_axis_data_tdata   fir_msf_q/m_axis_data_tdata ] IQconcat_ave]
 }
+
+#above was data_in [get_concat_pin [list [get_slice_pin msf_bram_timing/second_250_counter 3 0] [get_slice_pin fir_msf_i/m_axis_data_tdata 15 4] [get_slice_pin msf_bram_timing/second_250_counter 7 4] [get_slice_pin fir_msf_q/m_axis_data_tdata 15 4] ] IQconcat_ave]
 
 
 
