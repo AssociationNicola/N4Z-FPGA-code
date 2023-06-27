@@ -683,13 +683,14 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 tx_axis_fifo {
 
 
 
+#The tready signal is now dropped down to 8ksps to reduce flow rate from PS txfifo . Upsampling is done at the input of the fir (just retains the value for 5 clock pulses)!
 cell xilinx.com:ip:axis_clock_converter:1.1 tx_clock_converter {
   TDATA_NUM_BYTES 4
 } {
   s_axis_tdata tx_axis_fifo/axi_str_txd_tdata  
   s_axis_tvalid tx_axis_fifo/axi_str_txd_tvalid
   s_axis_tready tx_axis_fifo/axi_str_txd_tready
-  m_axis_tready cic_i/m_axis_data_tvalid
+
   m_axis_aresetn $rst_adc_clk_name/peripheral_aresetn
   s_axis_aresetn [set rst${intercon_idx}_name]/peripheral_aresetn
   m_axis_aclk $adc_clk
@@ -786,7 +787,7 @@ cell koheron:user:latched_mux:1.0 data_for_fir_i {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 4 4]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list agc_cic_i/P  [get_slice_pin tx_clock_converter/m_axis_tdata 31 16]] fir_i_inputs ]
+            din [get_concat_pin [list agc_cic_i/P  [get_Q_pin [get_slice_pin tx_clock_converter/m_axis_tdata 31 16] 1 tx_clock_converter/m_axis_tvalid $adc_clk latched_txfifo_value] ] fir_i_inputs ]
 
         }
 
@@ -798,7 +799,7 @@ cell koheron:user:latched_mux:1.0 data_for_fir_q {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 4 4]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list agc_cic_q/P  [get_slice_pin tx_clock_converter/m_axis_tdata 31 16]] fir_q_inputs ]
+            din [get_concat_pin [list agc_cic_q/P  [get_Q_pin [get_slice_pin tx_clock_converter/m_axis_tdata 31 16] 1 tx_clock_converter/m_axis_tvalid $adc_clk latched_txfifo_value] ] fir_q_inputs ]
 
         }
 
@@ -931,7 +932,7 @@ PipeStages 3
 
 
 
-
+connect_pin   tx_clock_converter/m_axis_tready fir_i/m_axis_data_tvalid
 
 
 
@@ -1505,4 +1506,4 @@ set_property range  [get_memory_range axi_uart]  $memory_segment_axi_uart
   connect_bd_net [get_bd_pins axi_spi0/io0_i] [get_bd_pins axi_spi0/io0_o]
   connect_bd_net [get_bd_ports user_spi_mosi] [get_bd_pins axi_spi0/io0_o]
 
-  connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt  axi_uartlite_0/interrupt ] interrupt_vec] 
+connect_pin ps_0/IRQ_F2P [get_concat_pin [list xadc_wiz_0/ip2intc_irpt axi_iic/iic2intc_irpt axi_spi0/ip2intc_irpt data_axis_fifo/interrupt tx_axis_fifo/interrupt  axi_uartlite_0/interrupt ] interrupt_vec] 
