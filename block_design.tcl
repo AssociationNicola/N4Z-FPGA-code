@@ -626,7 +626,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_q {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list agc_mult_q/P  latched_mic_input/Q] cic_q_inputs ]
+            din [get_concat_pin [list agc_mult_q/P  mic_notch_filter/dout] cic_q_inputs ]
 
         }
 
