@@ -24,6 +24,8 @@ cores:
   - ./cores/IQ_averager_v1_2
   - ./cores/timing_control_msf_v1_0
   - ./cores/QPSK_timing_v1_1
+  - ./cores/moving_average_9_v1_0
+
 
 memory:
   - name: control

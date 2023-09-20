@@ -595,6 +595,17 @@ connect_port_pin Uart_TX axi_uartlite_0/tx
 #2022 Widths 24>16 on mux inputs
 #Choose input to cic - either RX from antenna downconvert or audio from mic on ADC channel 2
 
+cell GN:user:moving_average_9:1.0 mic_notch_filter {
+DATA_WIDTH 16
+} {
+            clk  $adc_clk 
+           ce [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]
+            din [get_Q_pin [get_slice_pin adc_reader/Audio 31 16] 1 LeftValid/Res  $adc_clk latched_mic_input ]
+
+}
+
+
+
 cell koheron:user:latched_mux:1.0 data_for_cic_i {
             WIDTH 16
     	    N_INPUTS 2
@@ -603,7 +614,7 @@ cell koheron:user:latched_mux:1.0 data_for_cic_i {
             clk  $adc_clk 
             sel [get_slice_pin ctl/control 5 5]
             clken [get_constant_pin 1 1]
-            din [get_concat_pin [list agc_mult_i/P  [get_Q_pin [get_slice_pin adc_reader/Audio 31 16] 1 [get_and_pin adc_reader/IsUpdate adc_reader/IsLeft LeftValid ]  $adc_clk latched_mic_input ] ] cic_i_inputs ]
+            din [get_concat_pin [list agc_mult_i/P  mic_notch_filter/dout ] cic_i_inputs ]
 
         }
 
@@ -1216,7 +1227,7 @@ cell koheron:user:latched_mux:1.0 data_for_fifo {
   concat_audio_iq/dout \
   [get_concat_pin [list agc_cic_i/P  agc_cic_q/P ] concat_cic_iq] \
   adc_reader/Audio \
-  dds_msf/m_axis_data_tdata \
+  [get_concat_pin [list [get_constant_pin 0 16] latched_mic_input/Q ] zero_LSB_padded_micinput] \
   concat_msf_IQ/dout \
   IQconcat_ave/dout \
  ] data_options ]

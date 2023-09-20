@@ -7,6 +7,8 @@
 
 #include <context.hpp>
 
+
+
 namespace Xadc_regs {
     constexpr uint32_t set_chan = 0x324;
     constexpr uint32_t avg_en = 0x32C;
@@ -47,9 +49,22 @@ class Nicola4Z
 
     {
     }
+
+
+
+
     uint32_t xadc_read(uint32_t channel) {
         return xadc.read_reg(Xadc_regs::read + 4 * channel);
     }
+
+    float get_antenna_current() {
+        return 2E-2F * float(xadc_read(9));
+    }
+
+    float get_battery_level() {
+        return 2.9E-3F * float(xadc_read(1));
+    }
+
 
 
     uint64_t get_dna() {
