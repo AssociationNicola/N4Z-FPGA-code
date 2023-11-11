@@ -15,9 +15,9 @@ create_bd_port -dir O -from 7 -to 0 pmod_jb
 
 #create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 data_clk_in <This doesn't do anything!
 
-create_bd_port -dir O CS5340_MCLK
-create_bd_port -dir O Button_Active
-create_bd_port -dir O CS5340_NRST
+create_bd_port -dir O ADC_MCLK
+create_bd_port -dir I PowerState
+create_bd_port -dir O ADC_NRST
 create_bd_port -dir O SSB_Out0
 create_bd_port -dir O SSB_Out1
 create_bd_port -dir I TP_IRQ
@@ -25,15 +25,29 @@ create_bd_port -dir O RST
 create_bd_port -dir O LCD_RS
 create_bd_port -dir O LCD_CS
 create_bd_port -dir O TP_CS
-create_bd_port -dir O TestOut
-create_bd_port -dir O TX_High
-create_bd_port -dir O audio_speaker
-create_bd_port -dir O Volume
 
-# create_bd_port -dir O LCD_E
+
+create_bd_port -dir O audio_speaker_p
+create_bd_port -dir O audio_speaker_n
+create_bd_port -dir O Volume
+create_bd_port -dir O NShtdn
+create_bd_port -dir I PTT
+create_bd_port -dir O LED
+create_bd_port -dir O Spare
+create_bd_port -dir O TX_High
+create_bd_port -dir I -type clk -freq_hz 50000000 VCXO_CLK
+create_bd_port -dir I NOVFL
+create_bd_port -dir O NHPF 
+create_bd_port -dir O I2S
+
+create_bd_port -dir O VCXO
+create_bd_port -dir O TestOut
+create_bd_port -dir O P_Offn
+
+
 # create_bd_port -dir O LCD_RW
 # create_bd_port -dir O LCD_RS
-# create_bd_port -dir O LCD_V0
+
 # create_bd_port -dir O -from 7 -to 2 LCD
 
 
@@ -41,9 +55,9 @@ create_bd_port -dir I Uart_RX
 create_bd_port -dir O Uart_TX
 
 
-create_bd_port -dir I CS5340_SDout
-create_bd_port -dir I CS5340_SCLK
-create_bd_port -dir I CS5340_LRCLK
+create_bd_port -dir I ADC_SDout
+create_bd_port -dir I ADC_SCLK
+create_bd_port -dir I ADC_LRCLK
 
   set user_dio [ create_bd_port -dir O -from 6 -to 0 user_dio ]
   set led0 [ create_bd_port -dir O -from 2 -to 0 led0 ]
@@ -74,7 +88,7 @@ connect_pin [sts_pin ck_inner_io] ctl/ssb_tx_frequency
 
 
 # Rename clocks - adc_clk in this is 12.8MHz - ie 64x Sample rate of 200ksps and about 1/8 of the ps clock
-set adc_clk CS5340_SCLK
+set adc_clk ADC_SCLK
 
 #/peripheral_reset
 
@@ -86,26 +100,47 @@ cell xilinx.com:ip:proc_sys_reset:5.0 $rst_adc_clk_name {} {
   slowest_sync_clk $adc_clk
 }
 
+#Create clock buffer for VCXO_CLK
+cell xilinx.com:ip:util_ds_buf:2.1 util_ds_buf_0 {
+C_BUF_TYPE BUFG
+
+} {
 
 
-#Create clock for DAC, data output
+  BUFG_I VCXO_CLK
+
+}
+
+
+
+#Create clock for ADC, DAC, data output
+
+
 
 cell xilinx.com:ip:clk_wiz clk_wiz_0 {
-CLKOUT2_USED false
+USE_INCLK_SWITCHOVER true
+PRIM_IN_FREQ 50.000
 CLKOUT1_REQUESTED_OUT_FREQ 25.6
-CLKOUT2_REQUESTED_OUT_FREQ 200
-MMCM_DIVCLK_DIVIDE 5
-MMCM_CLKFBOUT_MULT_F 48.000
-MMCM_CLKOUT0_DIVIDE_F 37.5
+SECONDARY_IN_FREQ 50
+SECONDARY_SOURCE Single_ended_clock_capable_pin
+CLKIN1_JITTER_PS 200.0
+CLKIN2_JITTER_PS 200.0
+MMCM_DIVCLK_DIVIDE 1
+MMCM_CLKFBOUT_MULT_F 16.000
+MMCM_CLKIN1_PERIOD 20.000
+MMCM_CLKIN2_PERIOD 20.000
+MMCM_CLKOUT0_DIVIDE_F 31.250
 MMCM_CLKOUT1_DIVIDE 1
 NUM_OUT_CLKS 1
-CLKOUT1_JITTER 316
 
-CLKOUT1_PHASE_ERROR 301.6
+CLKOUT1_JITTER 256.849
+CLKOUT1_PHASE_ERROR 144.334
 
 
 } {
-    clk_in1 ps_0/fclk_clk0
+    clk_in1 ps_0/fclk_clk1
+    clk_in2 util_ds_buf_0/BUFG_O
+    clk_in_sel [get_slice_pin ctl/control 10 10]
     reset proc_sys_reset_0/peripheral_reset
 }
 
@@ -139,10 +174,10 @@ CLKOUT1_PHASE_ERROR 628.490
 cell TE:user:i2s_rx:1.0 adc_reader {
 
 } {
-Clock   CS5340_SCLK
+Clock   ADC_SCLK
 Reset  proc_sys_reset_adc_clk/peripheral_reset
-LRClock  CS5340_LRCLK
-Data  CS5340_SDout
+LRClock  ADC_LRCLK
+Data  ADC_SDout
 }
 
 
@@ -1343,9 +1378,11 @@ cell GN:user:OB_DAC:1.0 Audio_Speaker {
   i_res [set rst${intercon_idx}_name]/peripheral_aresetn
   i_ce  [get_constant_pin 1 1]
   i_func [get_Q_pin speaker_clock_converter/m_axis_tdata 1 noce clk_wiz_0/clk_out1 latched_speaker]
-  o_DAC audio_speaker
+  o_DAC audio_speaker_p
 }
 
+#Create inverted DAC output and connect to audio_speaker_n (this is for the alternate LM4952 audio amp)
+connect_pin audio_speaker_n [get_not_pin Audio_Speaker/o_DAC]
 
 #Volume output
 cell koheron:user:pdm:1.0 volume_pwm {
@@ -1355,13 +1392,33 @@ cell koheron:user:pdm:1.0 volume_pwm {
         rst [set rst${intercon_idx}_name]/peripheral_reset
     }
 
+#Volume output
+cell koheron:user:pdm:1.0 tcvcxo_pwm {
+        NBITS 16
+    } {
+        clk [set ps_clk$intercon_idx]
+        rst [set rst${intercon_idx}_name]/peripheral_reset
+    }
+
 
 #Connect output to volume pin and input from volume_control register
 connect_pin Volume volume_pwm/dout
-connect_pin volume_pwm/din [get_slice_pin ctl/volume 12 0]
+connect_pin volume_pwm/din [get_slice_pin ctl/volume 11 0]
 
+#Connect output to tcvcxo control pin and input from tcvcxo_control register
+connect_pin VCXO tcvcxo_pwm/dout
+connect_pin tcvcxo_pwm/din [get_slice_pin ctl/tcvcxo_control 15 0]
 
+#connect various ADC control pins
+connect_pin I2S [get_slice_pin ctl/control 8 8]
+connect_pin NHPF [get_slice_pin ctl/control 9 9]
+connect_pin Spare [get_slice_pin ctl/control 11 11]
+connect_pin LED [get_slice_pin ctl/control 12 12]
+connect_pin P_Offn [get_slice_pin ctl/control 13 13]
+connect_pin NShtdn [get_slice_pin ctl/control 14 14]
 
+#Connect status pins
+connect_pin [sts_pin status] [get_concat_pin [list PTT P_Offn [get_constant_pin 0 30]] padded_status]
 
 # Add AXI stream FIFO
 cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
@@ -1388,7 +1445,7 @@ cell xilinx.com:ip:axi_fifo_mm_s:4.1 data_axis_fifo {
 #  ce qpsk_timing/write
 #}
 
-connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status]
+#connect_pin [sts_pin status] [get_concat_pin [list msf_BRAM_timing/address_counter [get_constant_pin 0 20]] padded_status] <- Not currently used!
 connect_port_pin TestOut msf_BRAM_timing/one_sec_marker
 # was one_bit_count/Q  or msf_BRAM_timing/one_sec_marker now counts tx axis valid pulses to give square pulse with period twice the output data period (should be 12.5Hz)
 connect_port_pin TX_High [get_slice_pin ctl/control 1 1]
@@ -1452,9 +1509,9 @@ connect_pin dac_out/data  dac0_mux/dout
 
 
 
-connect_port_pin CS5340_NRST proc_sys_reset_0/peripheral_aresetn
+connect_port_pin ADC_NRST proc_sys_reset_0/peripheral_aresetn
 
-connect_port_pin CS5340_MCLK clk_wiz_0/clk_out1
+connect_port_pin ADC_MCLK clk_wiz_0/clk_out1
 #connect_port_pin repeat_MK clk_wiz_0/clk_out1
 
 

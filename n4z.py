@@ -14,13 +14,34 @@ from koheron import command, connect
 #	BRAMcontents=driver.SecondBRAM
 
 
+#Control Value bits:
+#0 LSB/USB
+#1 TXHigh state
+#2,3 & 7 Data fifo in options
+#4 FIR in value
+#5 ADC select (set to 1 for mic input)
+#6 Sends fixed amplitude to IQ_SSBmodulator for QPSK
+#8 I2S config
+#9 NHPF
+#10 50MHz int/ext clock select (set 50MHz int/ext source within PL through ctl/control register)
+#11 Spare
+#12 LED
+#13 Keep power on (make high after boot-up)
+
+ 
+#16 Select 1MSPS DAC out val
+
+#Acquisition bits
+#0 PTT button pressed
+#1 Power on button pressed
+
 class Nicola4Z(object):
     def __init__(self, client):
         self.client = client
         # self.n_pts = 16384
         self.n_pts = 1200
         self.fs = 2e5 # sampling frequency (Hz)
-        self.control_val = 0
+        self.control_val = 2**14 + 2**13 + 2**8    #To keep the power on and set I2S mode as well as enable the LM4952 power amp if fitted
         self.SecondBRAM_size = self.get_SecondBRAM_size()
         self.SecondBRAM = np.zeros((1, self.SecondBRAM_size))
         self.IQBRAM_size = self.get_IQBRAM_size()
@@ -64,6 +85,18 @@ class Nicola4Z(object):
     def get_status(self):
         return self.client.recv_uint32()
 
+
+    def get_ptt_state(self):
+        return self.get_status() & 1
+
+    def get_power_button_state(self):
+        return (self.get_status() & 2)>>1
+
+    def get_ovfl_state(self):
+        return 1-(self.get_status() & 4)>>2
+
+
+
     @command()
     def reset_fifo(self):
         pass
@@ -103,22 +136,18 @@ class Nicola4Z(object):
     def xadc_read(self,channel):
         return self.client.recv_uint32()
 
-    @command()
     def get_battery_level(self):
-        return self.client.recv_float()
+        return 2.6 + self.xadc_read(1)/2874
 
-    @command()
+
     def get_antenna_current(self):
-        return self.client.recv_float()
-
-
-    @command()
-    def get_data(self):
-        return self.client.recv_uint32()
-
-    @command()
-    def get_pd(self):
-        return self.client.recv_uint32()
+        ac=self.xadc_read(9)
+        tries=0
+        if ac>2**16:
+            while (ac>2**16 or tries>5):
+                ac=self.xadc_read(9)
+                tries+=1
+        return (ac - 250)/80 
 
 
     @command()
@@ -175,6 +204,13 @@ class Nicola4Z(object):
     def set_volume(self, value):
         pass
 
+
+    @command()
+    def set_tcvcxo_control(self, value):
+        pass
+
+
+
     @command()
     def set_agc_value(self, value):
         pass
@@ -216,6 +252,7 @@ class Nicola4Z(object):
 #[2:3] select data for data fifo (RX): 0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc
 #4 select input to FIRs: 0 from CIC agcs, 1 from ARM TX fifo (only top 16 bits)
 #5 select input to CICs: 0 from ADC 0 and downconvertor (set by local oscillator), 1 from ADC 1 (Mic input)
+
     @command()
     def set_control(self, value):
         self.control_val=value
@@ -228,8 +265,26 @@ class Nicola4Z(object):
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
+
+#Control Value bits:
+#0 LSB/USB
+#1 TXHigh state
+#2,3 & 7 Data fifo in options
+#4 FIR in value
+#5 ADC select (set to 1 for mic input)
+#6 Sends fixed amplitude to IQ_SSBmodulator for QPSK
+#8 I2S config
+#9 NHPF
+#10 NOVL
+#11 Spare
+#12 LED
+#13 Keep power on (make high after boot-up)
+#14 50MHz int/ext clock select (through tcvcxo_control register)
+#16 Select 1MSPS DAC out val
+
 #data fifo in options:  0 SSB receive and SSB(cordic) amp, 1 Freq and SSB amp, 2 I+Q after FIR agc, 3 I+Q after CIC agc, 4 raw ADC (ignore lowest 16 bits), 5  I+Q DDS, 6  I+Q after the multiplier (before cic), 7 I+Q after CIC agc
 #now includes an extra bit to add 4 further test option 4-7 (7 is a repeat of 3 but with a different trigger) - uses bits: 2,3,7 of control register
+#option 5 now looks at Microphone ADC at 200ksps (as of Sept 2023)
     def set_data_fifo_in_val(self, fvalue):
         value=(fvalue&3) << 2
         ext=(fvalue&4) << 5    #selects options 4-7
@@ -310,17 +365,68 @@ class Nicola4Z(object):
         self.control_val=self.control_val & (2**32 -1 -2 -2**2 -2**3 -2**4 -2**5)
         self.set_control(self.control_val)
 
-#Choose what to stream from FPGA to ARM:
+#Choose what to stream from FPGA to ARM (depracated - best to use set_data_fifo_in_val() ):
 #0 RX SSB demod
 #1 Cordic (amp, lowest 16 bits and phase, highest 16 bits)
 #2 Phase slope (zero padded to 32 bits)
 #3 Concatenated I and Q data after FIRs
-    def set_data_RX_value(self,value):
-        value=(value&3) << 2
+#    def set_data_RX_value(self,value):
+#        value=(value&3) << 2
 
-        self.control_val=self.control_val & (2**32 -1-2**2 -2**3)  #first reset the bits in question
-        self.control_val=self.control_val | value	  #then set them	
+#        self.control_val=self.control_val & (2**32 -1-2**2 -2**3)  #first reset the bits in question
+#        self.control_val=self.control_val | value	  #then set them	
+#        self.set_control(self.control_val)
+
+
+    def set_I2S(self, value):
+        value=(value&1) << 8
+
+        self.control_val=self.control_val & (2**32 -1 -2**8)
+        self.control_val=self.control_val | value
         self.set_control(self.control_val)
+
+    def set_NHPF(self, value):
+        value=(value&1) << 9
+
+        self.control_val=self.control_val & (2**32 -1 -2**9)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+    def set_ext_clk(self, value):
+        value=(value&1) << 10
+
+        self.control_val=self.control_val & (2**32 -1 -2**10)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+    def set_spare(self, value):
+        value=(value&1) << 11
+
+        self.control_val=self.control_val & (2**32 -1 -2**11)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+    def set_LED(self, value):
+        value=(value&1) << 12
+
+        self.control_val=self.control_val & (2**32 -1 -2**12)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+    def set_power_on(self, value):
+        value=(value&1) << 13
+
+        self.control_val=self.control_val & (2**32 -1 -2**13)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
+    def set_NShtdn(self, value):
+        value=(value&1) << 14
+
+        self.control_val=self.control_val & (2**32 -1 -2**14)
+        self.control_val=self.control_val | value
+        self.set_control(self.control_val)
+
 
 
 

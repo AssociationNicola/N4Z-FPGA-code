@@ -58,11 +58,11 @@ class Nicola4Z
     }
 
     float get_antenna_current() {
-        return 2E-2F * float(xadc_read(9));
+        return xadc_read(9);
     }
 
     float get_battery_level() {
-        return 2.9E-3F * float(xadc_read(1));
+        return xadc_read(1);
     }
 
 
@@ -145,6 +145,10 @@ class Nicola4Z
 
     void set_volume(uint32_t value) {
         ctl.write<reg::volume>(value);
+    }
+
+    void set_tcvcxo_control(uint32_t value) {
+        ctl.write<reg::tcvcxo_control>(value);
     }
 
     void set_agc_value(uint32_t value) {

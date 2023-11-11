@@ -89,6 +89,7 @@ control_registers:
   - agc_value
   - mult_agc_value
   - msf_agc_value
+  - tcvcxo_control
 
 
 
