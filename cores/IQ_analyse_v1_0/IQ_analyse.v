@@ -12,26 +12,29 @@ module iq_analyse #
   input  wire signed [DATA_WIDTH-1:0]  I_4sum,
   input  wire signed [DATA_WIDTH-1:0]  Q_4sum,
   input  wire [DATA_WIDTH-1:0]  Amp_4sum,
-  output   reg [DATA_WIDTH-1:0] Max_Amp,  //Temp
+
   output reg [6:0] bits_count,
-  output   reg  [2:0] sync_count,    //Temp 
-  output   reg  [2:0] max_sync,  //Temp  
-  output reg signed [DATA_WIDTH+8-1:0]  DI,     //TEMP need to only use top 16 bits
-  output reg signed [DATA_WIDTH+8-1:0]  DQ,
-  output wire [DATA_WIDTH-1:0] Ave_Amp_Out,  //Temp
+ 
+  output wire signed [DATA_WIDTH+8-1:8]  DI_out,
+  output wire signed [DATA_WIDTH+8-1:8]  DQ_out,
+  output reg max_val_sync,
   output reg strobe_out
 
 );
 
 
 
-//  reg [DATA_WIDTH-1:0] Max_Amp;
+  reg [DATA_WIDTH-1:0] Max_Amp;
   reg [DATA_WIDTH+8-1:0] Ave_Amp[0:4];
   reg [DATA_WIDTH+8-1:0] AmpSum;
 
-//  reg  [2:0] sync_count;
-//  reg  [2:0] max_sync;
-    reg signed [DATA_WIDTH+8-1:0] I_ave[0:79];
+reg signed [DATA_WIDTH+8-1:0]  DI;
+reg signed [DATA_WIDTH+8-1:0]  DQ;
+
+
+  reg  [2:0] sync_count;
+  reg  [2:0] max_sync;
+  reg signed [DATA_WIDTH+8-1:0] I_ave[0:79];
   reg signed [DATA_WIDTH+8-1:0] Q_ave[0:79];
 
   reg strobe1;
@@ -41,10 +44,34 @@ module iq_analyse #
   wire signed [DATA_WIDTH+8-1:0] Q4sumExt;
   assign I4sumExt= {{8{I_4sum[15]}},I_4sum};
   assign Q4sumExt= {{8{Q_4sum[15]}},Q_4sum};
+  wire Q31; 
+  
+  // SRLC32E: 32-Bit Shift Register Look-Up Table (LUT)
+//          Versal Prime series
+// Xilinx HDL Language Template, version 2023.2
+
+SRLC32E #(
+   .INIT(32'h00000000),    // Initial contents of shift register
+   .IS_CLK_INVERTED(1'b0)  // Optional inversion for CLK
+)
+SRLC32E_inst (
+   .Q(strobe_delay),     // 1-bit output: SRL Data
+   .Q31(Q31), // 1-bit output: SRL Cascade Data
+   .A(5'b10110),     // 5-bit input: Selects SRL depth
+   .CE(1'b1),   // 1-bit input: Clock enable
+   .CLK(clk), // 1-bit input: Clock
+   .D(strobe_in)      // 1-bit input: SRL Data
+);
+
+// End of SRLC32E_inst instantiation
+  
+  
+  
   
   always @(posedge clk) begin
     if (rst) begin
       sync_count <= 3'b000;
+      max_sync <= 3'b000;
       bits_count <= 6'b00000;
       Max_Amp <= 16'h0110;
       Ave_Amp[0]<=24'h000100;
@@ -53,6 +80,7 @@ module iq_analyse #
       Ave_Amp[3]<=24'h000100;
       Ave_Amp[4]<=24'h000100;
       AmpSum<=24'h000000;
+      max_val_sync <= 1'b0;
 
      for (i=0; i<80; i=i+1) begin
         I_ave[i]=24'sh000000; 
@@ -60,9 +88,16 @@ module iq_analyse #
      end      
            
     end
+    
     else begin
+    if ((sync_count == max_sync) & (strobe_out==1) ) begin
+       max_val_sync <= 1'b1;
+  
+     end else begin
+         max_val_sync <= 1'b0;  
+     end
 
-    strobe1 <= strobe_in;
+    strobe1 <= strobe_delay;
     strobe2 <= strobe1;
     strobe_out <= strobe2;
 
@@ -99,7 +134,7 @@ module iq_analyse #
 
     end
 
-    if ( (ce==1) & (strobe_out==1) ) begin
+    if ( (ce==1) & (strobe2==1) ) begin
     $display("inloop");
          if (sync_count==max_sync) begin
              I_ave[bits_count] <= I_ave[bits_count] - ((I_ave[bits_count])>>>8) + I4sumExt  ;
@@ -130,5 +165,7 @@ module iq_analyse #
 
 
   assign Ave_Amp_Out=Ave_Amp[sync_count][23:8];
+  assign DI_out=DI[DATA_WIDTH+8-1:8];
+  assign DQ_out=DQ[DATA_WIDTH+8-1:8];
 
 endmodule

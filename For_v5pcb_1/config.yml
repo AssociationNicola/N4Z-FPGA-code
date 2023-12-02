@@ -1,0 +1,160 @@
+---
+name: nicola4z
+board:  boards/cora07s
+version: 0.1.1
+
+cores:
+  - fpga/cores/axi_ctl_register_v1_0
+  - fpga/cores/dna_reader_v1_0
+  - fpga/cores/axi_sts_register_v1_0
+  - fpga/cores/latched_mux_v1_0
+  - fpga/cores/axis_constant_v1_0
+  - fpga/cores/axis_lfsr_v1_0
+  - fpga/cores/pdm_v1_0
+  - fpga/cores/dna_reader_v1_0
+  - fpga/cores/comparator_v1_0
+  - ./cores/OB_DAC_v1_0
+  - ./cores/ad5541_v1_0
+  - ./cores/edge_detector_v1_0
+  - ./cores/i2s_rx_v1_0
+  - ./cores/ssbiq_modulator_v1_0
+  - ./cores/mag_averager_v1_0
+  - ./cores/averager_v1_1
+  - ./cores/photodiode_delay_v1_0
+  - ./cores/IQ_averager_v1_2
+  - ./cores/timing_control_msf_v1_0
+  - ./cores/QPSK_timing_v1_1
+  - ./cores/moving_average_9_v1_0
+
+
+memory:
+  - name: control
+    offset: '0x60000000'
+    range: 4K
+
+  - name: SecondBRAM
+    offset: '0x60008000'
+    range: 16K
+
+  - name: IQBRAM
+    offset: '0x60040000'
+    range: 64K
+
+  - name: status
+    offset: '0x50000000'
+    range: 4K
+
+  - name: xadc
+    offset: '0x43C00000'
+    range: 4K
+
+  - name: tx_fifo
+    offset: '0x43C10000'
+    range: 16K
+
+
+  - name: data_fifo
+    offset: '0x43C20000'
+    range: 16K
+
+
+  - name: axi_uart
+    offset: '0x42C00000'
+    range: 64K
+
+
+
+  - name: ck_iic
+    offset: '0x40002000'
+    range: 4K
+
+  - name: axi_spi
+    offset: '0x40003000'
+    range: 4K
+
+#agc_value has 2 16 bit values used as gain in the multipliers, bit length is in number of carrier pulses (3100 for text) - phase repeated for 2 bit lengths!
+control_registers:
+  - led
+  - average
+  - user_io
+  - control
+  - phase_incr[2]
+  - msf_phase_incr[2]
+  - msf_frequency
+  - msf_low_time
+  - ssb_tx_frequency
+  - display_o
+  - lcd
+  - volume
+  - agc_value
+  - mult_agc_value
+  - msf_agc_value
+  - tcvcxo_control
+
+
+
+
+
+
+
+#control bits: 0 upper or lower side band on reception
+# 1 TX_high - enable SSBIQ (needed for both voice and qpsk)
+#2,3 and 7 Select data_fifo input (0 RX,1 From Cordic, 2 FIR_i, 3 FIR_q)
+#bit 4 select input to FIRs (0 for RX,1 for TX)
+#bit 5 selects ADC input (when set selects the  ADC which has the microphone, reset for normal input from antenna)
+#bit 6 selects QPSK of SSB transmitter if set. If 0 then normal SSB voice TX (but still requires 1 to be set!)
+#bit 7 used above
+#bit 16 selects DAC output (0 regular as top 16 bits of input val to data_fifo,1 value from user_io register), bit 30 resets the photodiode delay module, if connected bit 31 turns on the button irled
+#display bits (control): 0:DRST, 1:D_C, 2:ECS, 3:ENA, 4:SRCS, 5:SDCS
+#Note msf_carrier_counter contains secondBRAM address 0-3999 in 12 bits (drop lowest two bits and top 2 bits of lower 16bit chunk). Upper 16 bit chunk contains IQBRAM address (0-16383) in upper 14 bits.
+
+status_registers:
+  - forty_two
+  - average_amplitude
+  - average_mult
+  - msf_average_mult
+  - msf_average_amplitude
+  - msf_i
+  - msf_q
+  - msf_carrier_counter
+  - status
+  - max_amplitude
+  - ck_inner_io
+  - display_i
+
+
+#The ADC runs at 200ksps, and is decimated by 5 to 40kHz by the CIC. The FIR takes data at 40kHz either from the CIC or the BT input (via the FIFO from the ARM) and outputs data at 8kHz either to the ARM (to send to the earpiece) or at 8kHz to the SSB modulator. The BT interface from the ARM therefore has to work at 40ksps from the microphone but only 8ksps to the earpiece/speaker. adc_clk however is 200kHz*64, ie 12.8MHz, but adc_clk below is still set to 200kHz as that is the rate at which the values are used from the dds!
+#Added dds for the MSF clock signal (60 or 77.5kHz) - use zero crossing as an accurate 60kHz clock for synchronisation and use as 1 minute accumulation timer
+#Use msf decimation of 800 to have sample rate of 250Hz for the msf_signal andmsf_phase values (msf_average_amplitude is ~256 times slower)
+#Problem Oct 2022 - shouldn't adc_clk be 12.8MHz and not 200000Hz?
+parameters:
+  fclk0: 100000000 # FPGA clock speed in Hz
+  adc_clk: 200000   #Maybe this should be 12800000 rather than 200000?
+  adc_width: 16
+  cic_differential_delay: 1
+  cic_decimation_rate: 5
+  fir_decimation_rate: 5
+  cic_n_stages: 6
+
+  cic_msf_differential_delay: 2
+  cic_msf_decimation_rate: 800
+  cic_msf_n_stages: 6
+
+  pwm_width: 12
+  n_fir_sets: 2
+
+xdc:
+  - ./ports.xdc
+  - boards/cora07s/config/ck-analogue.xdc
+  - ./constraints.xdc
+
+drivers:
+  - server/drivers/common.hpp
+#  - server/drivers/xadc.hpp
+    #- boards/cora07s/drivers/pmod.hpp
+  - ./dds.hpp
+  - ./n4z.hpp
+
+web:
+  - web/koheron.ts
+  - web/main.css
