@@ -63,7 +63,7 @@ set_property -dict { PACKAGE_PIN R14   IOSTANDARD LVCMOS33 } [get_ports { Volume
 set_property -dict { PACKAGE_PIN U15   IOSTANDARD LVCMOS33 } [get_ports { ADC_SCLK }]; #IO_L11N_T1_SRCC_34 Sch=ck_io[10]
 ##set_property -dict { PACKAGE_PIN K18   IOSTANDARD LVCMOS33 } [get_ports { VCXO }]; #IO_L12N_T1_MRCC_35 Sch=ck_io[11]
 ##set_property -dict { PACKAGE_PIN J18   IOSTANDARD LVCMOS33 } [get_ports { TestOut }]; #IO_L14P_T2_AD4P_SRCC_35 Sch=ck_io[12]
-##set_property -dict { PACKAGE_PIN G15   IOSTANDARD LVCMOS33 } [get_ports { P_Offn }]; #IO_L19N_T3_VREF_35 Sch=ck_io[13]
+set_property -dict { PACKAGE_PIN G15   IOSTANDARD LVCMOS33 } [get_ports { P_Offn }]; #IO_L19N_T3_VREF_35 Sch=ck_io[13]
 
 ## ChipKit Inner Digital Header
 set_property -dict { PACKAGE_PIN R16   IOSTANDARD LVCMOS33 } [get_ports { ADC_LRCLK }]; #IO_L19P_T3_34 Sch=ck_io[26]

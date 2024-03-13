@@ -47,7 +47,7 @@ create_bd_port -dir O I2S
 
 #create_bd_port -dir O VCXO
 #create_bd_port -dir O TestOut
-#create_bd_port -dir O P_Offn
+create_bd_port -dir O P_Offn
 
 
 # create_bd_port -dir O LCD_RW
@@ -1438,8 +1438,12 @@ connect_pin I2S [get_slice_pin ctl/control 8 8]
 connect_pin NHPF [get_slice_pin ctl/control 9 9]
 #connect_pin Spare [get_slice_pin ctl/control 11 11]
 #connect_pin LED [get_slice_pin ctl/control 12 12]
-#connect_pin P_Offn [get_slice_pin ctl/control 13 13]
-#connect_pin NShtdn [get_slice_pin ctl/control 15 15]
+
+#Invert P_Offn pin so powers up default in high state, so set bit 13 high to power off
+connect_pin P_Offn [get_not_pin [get_slice_pin ctl/control 13 13] ]
+
+
+#connect_pin NShtdn [get_slice_pin ctl/control 15 15] 
 
 #Connect status pins
 #connect_pin [sts_pin status] [get_concat_pin [list PTT P_Offn NOVFL [get_constant_pin 0 29]] padded_status]

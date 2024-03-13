@@ -41,7 +41,7 @@ class Nicola4Z(object):
         # self.n_pts = 16384
         self.n_pts = 1200
         self.fs = 2e5 # sampling frequency (Hz)
-        self.control_val = 2**14 + 2**13 + 2**8    #To keep the power on and set I2S mode as well as enable the LM4952 power amp if fitted
+        self.control_val = 2**15 + 2**9 + 2**8    #To keep the power on and set I2S mode as well as enable the LM4952 power amp if fitted did have  + 2**14!
         self.SecondBRAM_size = self.get_SecondBRAM_size()
         self.SecondBRAM = np.zeros((1, self.SecondBRAM_size))
         self.IQBRAM_size = self.get_IQBRAM_size()
@@ -137,17 +137,32 @@ class Nicola4Z(object):
         return self.client.recv_uint32()
 
     def get_battery_level(self):
-        return 2.6 + self.xadc_read(1)/2874
+        return 2.4 + self.xadc_read(1)/1700
+
+
+    def get_battery_current(self):
+        return (self.xadc_read(0)-2000)/4900
 
 
     def get_antenna_current(self):
         ac=self.xadc_read(9)
         tries=0
         if ac>2**16:
-            while (ac>2**16 or tries>5):
+            while (ac>2**16 or tries<5):
                 ac=self.xadc_read(9)
                 tries+=1
         return (ac - 250)/80 
+
+    def get_antenna_voltage(self):
+        ac=self.xadc_read(8)
+        tries=0
+        if ac>2**16:
+            while (ac>2**16 or tries<5):
+                ac=self.xadc_read(9)
+                tries+=1
+        return (ac-1000)/62 
+
+
 
 
     @command()
@@ -367,17 +382,26 @@ class Nicola4Z(object):
         self.control_val=self.control_val & (2**32 -1 -2 -2**2 -2**3 -2**4 -2**5)
         self.set_control(self.control_val)
 
-#Choose what to stream from FPGA to ARM (depracated - best to use set_data_fifo_in_val() ):
-#0 RX SSB demod
-#1 Cordic (amp, lowest 16 bits and phase, highest 16 bits)
-#2 Phase slope (zero padded to 32 bits)
-#3 Concatenated I and Q data after FIRs
-#    def set_data_RX_value(self,value):
-#        value=(value&3) << 2
 
-#        self.control_val=self.control_val & (2**32 -1-2**2 -2**3)  #first reset the bits in question
-#        self.control_val=self.control_val | value	  #then set them	
-#        self.set_control(self.control_val)
+
+#Control Value bits:
+#0 LSB/USB
+#1 TXHigh state
+#2,3 & 7 Data fifo in options
+#4 FIR in value
+#5 ADC select (set to 1 for mic input)
+#6 Sends fixed amplitude to IQ_SSBmodulator for QPSK
+#8 I2S config
+#9 NHPF
+#10 50MHz int/ext clock select (through tcvcxo_control register)
+#11 Spare
+#12 LED
+#13 Keep power on (make high after boot-up)
+#14 Select speaker source (0=SSB rx, 1=TX fifo from ARM)
+#15 NShtdn
+#16 Select 1MSPS DAC out val
+
+
 
 
     def set_I2S(self, value):
@@ -423,9 +447,9 @@ class Nicola4Z(object):
         self.set_control(self.control_val)
 
     def set_NShtdn(self, value):
-        value=(value&1) << 14
+        value=(value&1) << 15
 
-        self.control_val=self.control_val & (2**32 -1 -2**14)
+        self.control_val=self.control_val & (2**32 -1 -2**15)
         self.control_val=self.control_val | value
         self.set_control(self.control_val)
 
