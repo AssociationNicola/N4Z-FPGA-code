@@ -31,9 +31,9 @@ create_bd_port -dir O TP_CS
 
 
 create_bd_port -dir O audio_speaker
-#create_bd_port -dir O audio_speaker_neg
+create_bd_port -dir O audio_speaker_inv
 create_bd_port -dir O Volume
-#create_bd_port -dir O NShtdn
+create_bd_port -dir O NShtd
 #create_bd_port -dir I PTT
 #create_bd_port -dir O LED
 #create_bd_port -dir O Spare
@@ -1196,6 +1196,19 @@ connect_pin [sts_pin msf_carrier_counter] [get_concat_pin [list msf_BRAM_timing/
 #Originally controlled phase with qpsk_phase [get_slice_pin ctl/qpsk 26 0]
 
 
+cell GN:user:amp_limiter:1.0 limit_amplitude {
+NBITS 16
+} {
+ clk clk_wiz_1/clk_out1
+ rst $rst_adc_clk_name/peripheral_reset
+ valid cordic_ssb/m_axis_dout_tvalid 
+ amplitude [get_Q_pin [get_slice_pin cordic_ssb/m_axis_dout_tdata 15 0]  1 noce clk_wiz_1/clk_out1 latched_amplitude]
+
+}
+
+
+
+
 cell GN:user:ssbiq_modulator:1.0 ssb_tx {
 NBITS 24
 } {
@@ -1203,7 +1216,7 @@ NBITS 24
  rst $rst_adc_clk_name/peripheral_reset
  delta_phase [get_slice_pin diff_phase/S 13 0] 
  ssb_freq  [get_slice_pin ctl/ssb_tx_frequency 29 0] 
- amplitude [get_Q_pin [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin cordic_ssb/m_axis_dout_tdata 14 0] ] padded_amplitude] 1 noce clk_wiz_1/clk_out1 latched_amplitude]
+ amplitude [get_concat_pin  [list [get_constant_pin 0 12] [get_slice_pin limit_amplitude/limited_amp 14 0] ] padded_amplitude]
  stdby [get_not_pin [get_slice_pin ctl/control 1 1] ]
  set_qpsk [get_slice_pin ctl/control 6 6]
  qpsk_phase [get_slice_pin IQ_bram/data_out 26 0]
@@ -1405,8 +1418,8 @@ cell GN:user:OB_DAC:1.0 Audio_Speaker {
   o_DAC audio_speaker
 }
 
-#Create inverted DAC output and connect to audio_speaker_n (this is for the alternate LM4952 audio amp)
-#connect_pin audio_speaker_neg [get_not_pin Audio_Speaker/o_DAC]
+#Create inverted DAC output and connect to audio_speaker_inv (this is for the alternate LM4952 audio amp)
+connect_pin audio_speaker_inv [get_not_pin Audio_Speaker/o_DAC]
 
 #Volume output
 cell koheron:user:pdm:1.0 volume_pwm {
@@ -1443,7 +1456,7 @@ connect_pin NHPF [get_slice_pin ctl/control 9 9]
 connect_pin P_Offn [get_not_pin [get_slice_pin ctl/control 13 13] ]
 
 
-#connect_pin NShtdn [get_slice_pin ctl/control 15 15] 
+connect_pin NShtd [get_slice_pin ctl/control 15 15] 
 
 #Connect status pins
 #connect_pin [sts_pin status] [get_concat_pin [list PTT P_Offn NOVFL [get_constant_pin 0 29]] padded_status]

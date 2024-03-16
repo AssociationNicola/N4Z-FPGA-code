@@ -25,6 +25,7 @@ cores:
   - ./cores/timing_control_msf_v1_0
   - ./cores/QPSK_timing_v1_1
   - ./cores/moving_average_9_v1_0
+  - ./cores/amp_limiter_v1_0
 
 
 memory:
